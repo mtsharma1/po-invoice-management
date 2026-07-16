@@ -70,53 +70,75 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
     : '/api/shell-orders/export';
 
   return (
-    <section className="dispatch-workbench">
-      <div className="dispatch-toolbar">
-        <div className="dispatch-field">
-          <label>PURCHASE ORDER</label>
-          <select value={selectedPO} onChange={(event) => selectPO(event.target.value)}>
-            <option value="">Select PO Number</option>
-            {poOptions.map((po) => (
-              <option key={po.POBarcode} value={po.POBarcode}>{po.POBarcode}</option>
-            ))}
-          </select>
-          <button className="mini-clear" type="button" onClick={clearFilter} title="Clear filter">Clear</button>
+    <section className="dispatch-workbench shell-order-workbench">
+      <div className="dispatch-command-panel">
+        {/* <div className="dispatch-command-heading">
+          <div>
+            <p>Shell order control</p>
+            <h2>Plan stock allocation</h2>
+            <span>Create shell orders, synchronize stock and review final size-wise quantities.</span>
+          </div>
+          <span className={`dispatch-mode-badge ${selectedPO ? 'editing' : ''}`}>
+            <i /> {selectedPO ? 'Purchase order selected' : 'Awaiting selection'}
+          </span>
+        </div> */}
+
+        <div className="dispatch-selector-row">
+          <label className="dispatch-modern-field dispatch-po-selector">
+            <span>Purchase order</span>
+            <div>
+              <select value={selectedPO} onChange={(event) => selectPO(event.target.value)}>
+                <option value="">Select PO Number</option>
+                {poOptions.map((po) => (
+                  <option key={po.POBarcode} value={po.POBarcode}>{po.POBarcode}</option>
+                ))}
+              </select>
+              {selectedPO ? <button className="dispatch-clear" type="button" onClick={clearFilter} title="Clear purchase order">×</button> : null}
+            </div>
+          </label>
+
+          <div className="dispatch-context-item">
+            <span>Party</span>
+            <strong>{selectedPO ? text(poContext?.Party || poContext?.VendorName) : 'Select a purchase order'}</strong>
+          </div>
+
+          <div className="dispatch-context-item ship-to">
+            <span>Ship to</span>
+            <strong>{selectedPO ? text(poContext?.ShipTo) : 'Delivery address will appear here'}</strong>
+          </div>
         </div>
 
-        <div className="dispatch-buttons">
-          <button type="button" onClick={() => runPOAction('/api/shell-orders/create')} disabled={isPending}>
-            CREATE SHELL ORDER
-          </button>
-          <button type="button" onClick={() => runPOAction('/api/shell-orders/refresh-stock')} disabled={isPending}>
-            REFRESH STOCK
-          </button>
-          <button type="button" onClick={updateAvailableStock} disabled={isPending}>
-            UPDATE AVAILABLE STOCK
-          </button>
-          <a href={exportUrl}>EXPORT TO EXCEL</a>
-        </div>
-
-        <div className="dispatch-field invoice-placeholder">
-          <label>INVOICE NO</label>
-          <input value="" readOnly aria-label="Invoice number placeholder" />
+        <div className="dispatch-action-row shell-action-row">
+          <div className="dispatch-action-group">
+            <button className="dispatch-action primary" type="button" onClick={() => runPOAction('/api/shell-orders/create')} disabled={isPending}>
+              <span aria-hidden="true">＋</span> Create shell order
+            </button>
+            <button className="dispatch-action secondary" type="button" onClick={() => runPOAction('/api/shell-orders/refresh-stock')} disabled={isPending}>
+              <span aria-hidden="true">↻</span> Refresh stock
+            </button>
+            <button className="dispatch-action ghost" type="button" onClick={updateAvailableStock} disabled={isPending}>
+              <span aria-hidden="true">⇄</span> Update available stock
+            </button>
+            <a className="dispatch-action export" href={exportUrl}>
+              <span aria-hidden="true">↓</span> Export to Excel
+            </a>
+          </div>
+          <p className="shell-action-hint">{isPending ? 'Working…' : 'Stock values are synchronized from Tranzact.'}</p>
         </div>
       </div>
 
-      <div className="dispatch-info-grid">
-        <div className="dispatch-field">
-          <label>PARTY</label>
-          <textarea value={selectedPO ? text(poContext?.Party || poContext?.VendorName) : ''} readOnly />
-        </div>
-        <div className="dispatch-field ship-to">
-          <label>SHIP TO</label>
-          <textarea value={selectedPO ? text(poContext?.ShipTo) : ''} readOnly />
-        </div>
-      </div>
+      {message ? <div className="dispatch-message"><span aria-hidden="true">i</span>{message}</div> : null}
 
-      {message ? <div className="dispatch-message">{message}</div> : null}
-
-      <div className="dispatch-grid-shell">
-        <table className="dispatch-grid">
+      <div className="dispatch-data-panel">
+        <div className="dispatch-data-heading">
+          <div>
+            <p>Stock allocation lines</p>
+            <h3>{selectedPO || 'No purchase order selected'}</h3>
+          </div>
+          <span>{rows.length} item{rows.length === 1 ? '' : 's'}</span>
+        </div>
+        <div className="dispatch-grid-shell shell-order-grid-shell">
+          <table className="dispatch-grid shell-order-grid">
           <thead>
             <tr>
               <th>SOID</th>
@@ -181,12 +203,15 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
             {!rows.length ? (
               <tr>
                 <td colSpan="26" className="empty-grid-cell">
-                  {selectedPO ? 'No shell order rows found for this PO. Click CREATE SHELL ORDER.' : 'Select a PO Number to filter the shell order grid.'}
+                  <span aria-hidden="true">◇</span>
+                  <strong>{selectedPO ? 'No shell order lines found' : 'Choose a purchase order to begin'}</strong>
+                  <small>{selectedPO ? 'Create a shell order to generate the size-wise stock allocation.' : 'Shell order quantities and stock values will appear here.'}</small>
                 </td>
               </tr>
             ) : null}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </section>
   );

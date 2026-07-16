@@ -163,67 +163,95 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
 
   return (
     <section className="dispatch-workbench">
-      <div className="dispatch-toolbar">
-        <div className="dispatch-field">
-          <label>PURCHASE ORDER</label>
-          <select value={selectedPO} onChange={(event) => selectPO(event.target.value)}>
-            <option value="">Select PO Number</option>
-            {poOptions.map((po) => (
-              <option key={po.POBarcode} value={po.POBarcode}>{po.POBarcode}</option>
-            ))}
-          </select>
-          <button className="mini-clear" type="button" onClick={clearFilter} title="Clear filter">Clear</button>
+      <div className="dispatch-command-panel">
+        <div className="dispatch-command-heading">
+          <div>
+            <p>Dispatch control</p>
+            <h2>Prepare your shipment</h2>
+            <span>Select a purchase order, confirm quantities and post it against an invoice.</span>
+          </div>
+          <span className={`dispatch-mode-badge ${isEditMode ? 'editing' : ''}`}>
+            <i /> {isEditMode ? 'Editing quantities' : selectedPO ? 'View mode' : 'Awaiting selection'}
+          </span>
         </div>
 
-        <div className="dispatch-buttons">
-          <button type="button" onClick={() => runPOAction('/api/dispatch/view', 'view')} disabled={isPending}>
-            VIEW
-          </button>
-          <button type="button" onClick={() => runPOAction('/api/dispatch/create', 'edit')} disabled={isPending}>
-            CREATE DISPATCH
-          </button>
-          <button type="button" onClick={chooseUploadFile} disabled={isPending}>
-            UPLOAD
-          </button>
-          <button type="button" onClick={postDispatch} disabled={isPending}>
-            POST
-          </button>
-          <a href="/api/dispatch/template">OPEN TEMPLATE</a>
-          <input
-            ref={uploadInputRef}
-            className="hidden-file-input"
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={uploadDispatchFile}
-          />
+        <div className="dispatch-selector-row">
+          <label className="dispatch-modern-field dispatch-po-selector">
+            <span>Purchase order</span>
+            <div>
+              <select value={selectedPO} onChange={(event) => selectPO(event.target.value)}>
+                <option value="">Select PO Number</option>
+                {poOptions.map((po) => (
+                  <option key={po.POBarcode} value={po.POBarcode}>{po.POBarcode}</option>
+                ))}
+              </select>
+              {selectedPO ? <button className="dispatch-clear" type="button" onClick={clearFilter} title="Clear purchase order">×</button> : null}
+            </div>
+          </label>
+
+          <div className="dispatch-context-item">
+            <span>Party</span>
+            <strong>{selectedPO ? text(poContext?.Party || poContext?.VendorName) : 'Select a purchase order'}</strong>
+          </div>
+
+          <div className="dispatch-context-item ship-to">
+            <span>Ship to</span>
+            <strong>{selectedPO ? text(poContext?.ShipTo) : 'Delivery address will appear here'}</strong>
+          </div>
         </div>
 
-        <div className="dispatch-field invoice-placeholder">
-          <label>INVOICE NO</label>
-          <input
-            value={invoiceNo}
-            onChange={(event) => setInvoiceNo(event.target.value)}
-            aria-label="Invoice number"
-            placeholder="Enter invoice no"
-          />
+        <div className="dispatch-action-row">
+          <div className="dispatch-action-group">
+            <button className="dispatch-action secondary" type="button" onClick={() => runPOAction('/api/dispatch/view', 'view')} disabled={isPending}>
+              <span aria-hidden="true">◉</span> View dispatch
+            </button>
+            <button className="dispatch-action primary" type="button" onClick={() => runPOAction('/api/dispatch/create', 'edit')} disabled={isPending}>
+              <span aria-hidden="true">＋</span> Create dispatch
+            </button>
+            <button className="dispatch-action secondary" type="button" onClick={chooseUploadFile} disabled={isPending}>
+              <span aria-hidden="true">↑</span> Upload Excel
+            </button>
+            <a className="dispatch-action ghost" href="/api/dispatch/template">
+              <span aria-hidden="true">↓</span> Template
+            </a>
+            <input
+              ref={uploadInputRef}
+              className="hidden-file-input"
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={uploadDispatchFile}
+            />
+          </div>
+
+          <div className="dispatch-post-group">
+            <label className="dispatch-modern-field">
+              <span>Invoice number</span>
+              <input
+                value={invoiceNo}
+                onChange={(event) => setInvoiceNo(event.target.value)}
+                aria-label="Invoice number"
+                placeholder="Enter invoice no"
+              />
+            </label>
+            <button className="dispatch-post-button" type="button" onClick={postDispatch} disabled={isPending}>
+              {isPending ? 'Working…' : 'Post dispatch'} <span aria-hidden="true">→</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="dispatch-info-grid">
-        <div className="dispatch-field">
-          <label>PARTY</label>
-          <textarea value={selectedPO ? text(poContext?.Party || poContext?.VendorName) : ''} readOnly />
-        </div>
-        <div className="dispatch-field ship-to">
-          <label>SHIP TO</label>
-          <textarea value={selectedPO ? text(poContext?.ShipTo) : ''} readOnly />
-        </div>
-      </div>
+      {message ? <div className="dispatch-message"><span aria-hidden="true">i</span>{message}</div> : null}
 
-      {message ? <div className="dispatch-message">{message}</div> : null}
-
-      <div className="dispatch-grid-shell">
-        <table className="dispatch-grid">
+      <div className="dispatch-data-panel">
+        <div className="dispatch-data-heading">
+          <div>
+            <p>Shipment lines</p>
+            <h3>{selectedPO || 'No purchase order selected'}</h3>
+          </div>
+          <span>{isEditMode ? 'Edit DispatchQty and press Enter to save' : `${draftRows.length} item${draftRows.length === 1 ? '' : 's'}`}</span>
+        </div>
+        <div className="dispatch-grid-shell">
+          <table className="dispatch-grid">
           <thead>
             <tr>
               <th>POID</th>
@@ -281,12 +309,15 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
             {!draftRows.length ? (
               <tr>
                 <td colSpan="14" className="empty-grid-cell">
-                  {selectedPO ? 'No dispatch rows found. Click CREATE DISPATCH or VIEW.' : 'Select a PO Number to filter the dispatch grid.'}
+                  <span aria-hidden="true">↗</span>
+                  <strong>{selectedPO ? 'No dispatch lines found' : 'Choose a purchase order to begin'}</strong>
+                  <small>{selectedPO ? 'Create a new dispatch or view previously posted rows.' : 'The shipment lines and quantities will appear here.'}</small>
                 </td>
               </tr>
             ) : null}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </section>
   );

@@ -114,28 +114,41 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
 
   return (
     <section className="customer-invoice-access">
-      <div className="customer-invoice-title">INVOICE FORM</div>
+      {/* <div className="customer-invoice-title">
+        <div>
+          <p>Invoice workspace</p>
+          <h2>{form.InvoiceNo ? `Invoice ${form.InvoiceNo}` : 'Create customer invoice'}</h2>
+          <span>Capture invoice references, tax details, addresses and bank information.</span>
+        </div>
+        <span className={`invoice-record-badge ${form.InvoiceNo ? 'active' : ''}`}>
+          <i /> {form.InvoiceNo ? 'Invoice selected' : 'New invoice'}
+        </span>
+      </div> */}
 
       <div className="customer-invoice-grid">
         <div className="customer-invoice-left">
           <div className="access-search-row main-search-row">
-            <label>Search :</label>
+            <label>Invoice lookup</label>
             <input
-              placeholder="Invoice No"
+              placeholder="Enter invoice number"
               value={mainSearchText}
               onChange={(event) => setMainSearchText(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') runMainSearch();
               }}
             />
+            <button className="invoice-search-button" type="button" onClick={runMainSearch}>Search</button>
             <button className="filter-clear-btn" type="button" onClick={clearMainSearch} title="Clear main form search">Clear</button>
             {canPrint ? (
-              <a className="access-command export-command" href={exportHref}>EXPORT TO EXL</a>
+              <a className="access-command export-command" href={exportHref}>↓ Export Excel</a>
             ) : (
-              <button className="access-command export-command" type="button" disabled>EXPORT TO EXL</button>
+              <button className="access-command export-command" type="button" disabled>↓ Export Excel</button>
             )}
           </div>
 
+          <div className="invoice-section-heading">
+            <div><p>Invoice details</p><span>Primary identifiers and tax configuration</span></div>
+          </div>
           <div className="invoice-top-panel">
             <div className="invoice-basic-fields">
               <FormInput label="PO Barcode" value={form.POBarcode} onChange={(value) => updateField('POBarcode', value)} />
@@ -144,15 +157,15 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
               <FormInput label="Ack Date" type="datetime-local" value={dateTimeInput(form.AckDate)} onChange={(value) => updateField('AckDate', value)} />
               <FormInput label="Invoice No" value={form.InvoiceNo} onChange={(value) => updateField('InvoiceNo', value)} />
               <FormInput label="Seal No." value={form.SealNo} onChange={(value) => updateField('SealNo', value)} />
-              <FormInput label="Orde Number (POBarcode)." value={form.OrderNumber} onChange={(value) => updateField('OrderNumber', value)} />
-              <FormInput label="Order Date (POApprovedDate:)" type="date" value={dateInput(form.OrderDate)} onChange={(value) => updateField('OrderDate', value)} />
+              <FormInput label="Order Number" value={form.OrderNumber} onChange={(value) => updateField('OrderNumber', value)} />
+              <FormInput label="Order Date" type="date" value={dateInput(form.OrderDate)} onChange={(value) => updateField('OrderDate', value)} />
             </div>
 
             <div className="invoice-tax-fields">
               <FormInput label="Invoice Date" type="date" value={dateInput(form.InvoiceDate)} onChange={(value) => updateField('InvoiceDate', value)} />
               <FormInput label="IGST Rate" type="number" value={form.IGSTRate} onChange={(value) => updateField('IGSTRate', value)} />
               <FormInput label="SGST Rate" type="number" value={form.SGST} onChange={(value) => updateField('SGST', value)} />
-              <FormInput label="SGST Rate" type="number" value={form.CGST} onChange={(value) => updateField('CGST', value)} />
+              <FormInput label="CGST Rate" type="number" value={form.CGST} onChange={(value) => updateField('CGST', value)} />
               <label className="invoice-check">
                 <input
                   type="checkbox"
@@ -165,10 +178,13 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
 
             <div className="invoice-qr-box">
               <img src={qrSrc} alt="Invoice QR preview" />
-              <button type="button" onClick={generateQR} disabled={isPending}>Generate QR</button>
+              <button type="button" onClick={generateQR} disabled={isPending}>Refresh QR</button>
             </div>
           </div>
 
+          <div className="invoice-section-heading address-heading">
+            <div><p>Billing &amp; delivery</p><span>Confirm the parties and addresses shown on the invoice</span></div>
+          </div>
           <div className="invoice-address-grid">
             <AddressBlock
               title="BILL FROM NAME"
@@ -215,29 +231,33 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
           </div>
 
           <div className="invoice-action-bar">
-            <button type="button" onClick={addNew}>ADD NEW</button>
-            <button type="button" onClick={saveInvoice} disabled={isPending}>SAVE</button>
+            <button type="button" onClick={addNew}>＋ New invoice</button>
+            <button className="save-invoice-button" type="button" onClick={saveInvoice} disabled={isPending}>{isPending ? 'Saving…' : 'Save invoice'}</button>
             {canPrint ? (
-              <Link href={`/invoices/${encodeURIComponent(form.InvoiceNo)}`}>PRINT</Link>
+              <Link href={`/invoices/${encodeURIComponent(form.InvoiceNo)}`}>Print preview →</Link>
             ) : (
-              <button type="button" disabled>PRINT</button>
+              <button type="button" disabled>Print preview →</button>
             )}
           </div>
           {message ? <div className="dispatch-message">{message}</div> : null}
         </div>
 
         <aside className="customer-invoice-right">
-          <div className="invoice-list-title">List of Invoice</div>
+          <div className="invoice-list-title">
+            <div><p>Recent records</p><strong>Invoice list</strong></div>
+            <span>{rows.length}</span>
+          </div>
           <div className="access-search-row invoice-list-search-row">
-            <label>Search :</label>
+            <label>Filter</label>
             <input
-              placeholder="Invoice No"
+              placeholder="Invoice number"
               value={listSearchText}
               onChange={(event) => setListSearchText(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') runListSearch();
               }}
             />
+            <button className="invoice-search-button" type="button" onClick={runListSearch}>Search</button>
             <button className="filter-clear-btn" type="button" onClick={clearListSearch} title="Clear invoice list search">Clear</button>
           </div>
           <div className="invoice-list-scroll">
