@@ -1,0 +1,15 @@
+
+> teakwood-po-invoice-web@0.1.0 dev
+> node ./node_modules/next/dist/bin/next dev
+
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.37:3000
+- Environments: .env.local
+✓ Ready in 2.0s
+
+ GET /dispatch 200 in 2.4s (next.js: 542ms, application-code: 1858ms)
+ GET /api/health 200 in 479ms (next.js: 371ms, application-code: 109ms)
+ GET /dispatch 200 in 725ms (next.js: 20ms, application-code: 705ms)
+ GET /dispatch 200 in 236ms (next.js: 15ms, application-code: 222ms)
+[?25h
