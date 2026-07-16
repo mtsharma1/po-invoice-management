@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs';
 import { query, withTransaction } from './db';
 
 const headerColumns = [
@@ -285,6 +284,7 @@ export async function ensureWebImportTables(run = query) {
 async function parsePurchaseOrderWorkbook(fileBuffer) {
   if (!fileBuffer?.length) throw new Error('Please select a purchase order Excel file.');
 
+  const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer);
   const worksheet = workbook.getWorksheet('Purchase Order') || workbook.worksheets[0];

@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs';
 import { query, withTransaction } from './db';
 import { fetchTranzactAvailableStock } from './tranzact';
 
@@ -283,6 +282,7 @@ async function updateSizeWiseQty(poBarcode, run) {
 
 export async function buildShellOrderExportWorkbook(poBarcode = '') {
   const rows = await listShellOrders({ poBarcode, limit: 10000 });
+  const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Teakwood PO & Invoice Web';
   workbook.created = new Date();

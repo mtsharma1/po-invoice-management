@@ -9,6 +9,7 @@ This is the Next.js + Node.js + MySQL migration foundation for `PO and Invoice M
 - Printable invoice page styled to behave like the Access `rptInvoice` layout.
 - Excel invoice export with A4 portrait print settings and fit-to-width printing.
 - Hostinger VPS deployment notes.
+- Authentication against the existing Access/MySQL users with signed, HTTP-only sessions.
 
 ## Local Setup
 
@@ -19,6 +20,10 @@ npm install
 ```
 
 2. Create `.env.local` from `.env.example` and fill MySQL credentials.
+
+   Set `APP_SESSION_SECRET` to a long random value before production deployment.
+   The application keeps legacy plain-text password compatibility because Access
+   still uses those records; passwords are never returned to the browser.
 
 3. Start the app:
 

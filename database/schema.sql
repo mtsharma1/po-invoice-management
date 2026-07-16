@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS tblUsers (
   INDEX IX_tblUsers_Access (Access)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Web authentication uses signed, HTTP-only cookies and the existing tblUsers records.
+-- isActive remains untouched because Access uses it as login state, not account eligibility.
+
 CREATE TABLE IF NOT EXISTS tblPOHeaders (
   POBarcode VARCHAR(50) NOT NULL,
   POApprovedDate DATETIME NULL,

@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { dateText, dateTimeText, money, text } from './format';
@@ -7,6 +6,7 @@ const borderThin = { style: 'thin', color: { argb: 'FF000000' } };
 const borderMedium = { style: 'medium', color: { argb: 'FF000000' } };
 
 export async function buildInvoiceWorkbook({ header, lines, totals }) {
+  const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Teakwood PO & Invoice Web';
   workbook.created = new Date();

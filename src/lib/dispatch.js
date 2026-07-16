@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs';
 import { query, withTransaction } from './db';
 import { getShellOrderContext, listPOBarcodes } from './shellOrders';
 
@@ -363,6 +362,7 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
 export async function uploadDispatchFile({ sessionId, selectedPO = '', fileBuffer }) {
   if (!fileBuffer?.length) throw new Error('Please select a file to import.');
 
+  const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(fileBuffer);
   const worksheet = workbook.getWorksheet('Sheet1') || workbook.worksheets[0];

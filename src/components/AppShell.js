@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { getCurrentSession } from '@/lib/auth';
 
 const nav = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -11,7 +13,10 @@ const nav = [
   { href: '/settings', label: 'Settings' },
 ];
 
-export default function AppShell({ children }) {
+export default async function AppShell({ children }) {
+  const session = await getCurrentSession();
+  if (!session) redirect('/login');
+
   return (
     <div className="app-frame">
       <aside className="sidebar">
@@ -27,6 +32,14 @@ export default function AppShell({ children }) {
             <Link href={item.href} key={item.href}>{item.label}</Link>
           ))}
         </nav>
+        <div className="sidebar-session">
+          <small>Signed in as</small>
+          <strong>{session?.userId || 'User'}</strong>
+          <span>{session?.role || 'User'}</span>
+          <form action="/api/auth/logout" method="post">
+            <button type="submit">Sign out</button>
+          </form>
+        </div>
       </aside>
       <main className="main-panel">{children}</main>
     </div>

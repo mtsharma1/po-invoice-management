@@ -43,6 +43,8 @@ input {
   position: sticky;
   top: 0;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
   padding: 24px;
   color: #fffaf0;
   background:
@@ -288,6 +290,57 @@ table.data-table {
   border-radius: 14px;
   border: 1px solid #d7cab7;
   background: #fffaf0;
+}
+
+.login-help {
+  color: var(--muted);
+  margin: 10px 0 0;
+}
+
+.login-error {
+  background: #fff1f1;
+  border: 1px solid #e4a7a7;
+  border-radius: 8px;
+  color: #9b1c1c;
+  margin: 16px 0 0;
+  padding: 10px 12px;
+}
+
+.sidebar-session {
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  display: grid;
+  gap: 3px;
+  margin-top: auto;
+  padding: 18px 8px 4px;
+}
+
+.sidebar-session small,
+.sidebar-session span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.76rem;
+}
+
+.sidebar-session strong {
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+
+.sidebar-session form {
+  margin-top: 10px;
+}
+
+.sidebar-session button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 7px;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.sidebar-session button:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .invoice-toolbar {
