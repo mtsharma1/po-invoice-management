@@ -17,7 +17,7 @@ export default async function ImportPage() {
 
   return (
     <AppShell>
-      {/* <PageHeader eyebrow="Excel Import" title="Import" /> */}
+      <PageHeader eyebrow="Excel Import" title="IMPORT" />
       <DataError error={error} />
       <ImportWorkbench header={data.header} rows={data.rows} />
     </AppShell>

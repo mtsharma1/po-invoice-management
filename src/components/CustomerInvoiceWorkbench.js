@@ -7,13 +7,6 @@ import { dateText } from '@/lib/format';
 import { invoiceQrUrl } from '@/lib/invoiceQr';
 import ActionIcon from './ActionIcon';
 
-const defaultBankDetails = {
-  AccountNo: '6811361613',
-  BankName: 'KOTAK MAHINDRA BANK LTD.',
-  BranchName: 'SEC-14, GURGAON',
-  IFSCCode: 'KKBK0000287',
-};
-
 export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, selectedInvoiceNo, search }) {
   const router = useRouter();
   const [form, setForm] = useState(normaliseInvoice(selectedInvoice));
@@ -125,7 +118,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
     <section className="customer-invoice-access">
       <div className="customer-invoice-title">
         <div>
-          <p>Invoice workspace</p>
+          <h3>Invoice workspace</h3>
           <h2>{form.InvoiceNo ? `Invoice ${form.InvoiceNo}` : 'Create customer invoice'}</h2>
           <span>Capture invoice references, tax details, addresses and bank information.</span>
         </div>
@@ -218,7 +211,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
           </div>
 
           <div className="bank-panel">
-            <div className="bank-title bg-green-500">BANK DETAILS</div>
+            <div className="bank-title">BANK DETAILS</div>
             <div className="bank-grid">
               <FormInput label="Account No." value={form.AccountNo} onChange={(value) => updateField('AccountNo', value)} />
               <FormInput label="Bank Name" value={form.BankName} onChange={(value) => updateField('BankName', value)} />
@@ -311,14 +304,7 @@ function AddressBlock({ title, addressTitle, name, address, onName, onAddress })
 }
 
 function normaliseInvoice(invoice) {
-  const normalised = { ...(invoice || {}) };
-  return {
-    ...normalised,
-    AccountNo: normalised.AccountNo || defaultBankDetails.AccountNo,
-    BankName: normalised.BankName || defaultBankDetails.BankName,
-    BranchName: normalised.BranchName || defaultBankDetails.BranchName,
-    IFSCCode: normalised.IFSCCode || defaultBankDetails.IFSCCode,
-  };
+  return { ...(invoice || {}) };
 }
 
 function dateInput(value) {

@@ -20,7 +20,7 @@ export default async function SettingsPage() {
 
   return (
     <AppShell>
-      <PageHeader eyebrow="ADMINISTRATOR" title="SETTINGS" />
+      {/* <PageHeader eyebrow="ADMINISTRATOR" title="SETTINGS" /> */}
       <DataError error={error} />
       <SettingsWorkbench data={data} />
     </AppShell>
