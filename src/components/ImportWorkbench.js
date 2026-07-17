@@ -100,17 +100,17 @@ export default function ImportWorkbench({ header, rows }) {
             <h2>Load an Excel purchase order</h2>
             <span>Select a workbook, review the header and item rows, then save it to the live database.</span>
           </div>
+            <div className="po-import-actions">
+              <button className="po-import-primary po-import-upload" type="button" onClick={chooseFile} disabled={isPending}>
+                <ActionIcon name="upload" /> {isPending ? 'Importing…' : 'Import PO'}
+              </button>
+              <button className="po-import-save" type="button" onClick={saveToDatabase} disabled={isPending || !rows.length}><ActionIcon name="save" /> Save to database</button>
+              <a className="po-import-template" href="/api/import/template"><ActionIcon name="download" /> Download template</a>
+              <input ref={inputRef} className="hidden-file-input" type="file" accept=".xlsx,.xls" onChange={uploadFile} />
           <span className={`po-import-status ${rows.length ? 'ready' : ''}`}>{rows.length ? `${rows.length} rows ready` : 'Waiting for file'}</span>
+          </div>
         </div>
 
-        <div className="po-import-actions">
-          <button className="po-import-primary po-import-upload" type="button" onClick={chooseFile} disabled={isPending}>
-            <ActionIcon name="upload" /> {isPending ? 'Importing…' : 'Import PO'}
-          </button>
-          <button className="po-import-save" type="button" onClick={saveToDatabase} disabled={isPending || !rows.length}><ActionIcon name="save" /> Save to database</button>
-          <a className="po-import-template" href="/api/import/template"><ActionIcon name="download" /> Download template</a>
-          <input ref={inputRef} className="hidden-file-input" type="file" accept=".xlsx,.xls" onChange={uploadFile} />
-        </div>
 
         {fileName ? <div className="po-import-file"><span>Selected workbook</span><strong>{fileName}</strong></div> : null}
         {message ? <div className="dispatch-message">{message}</div> : null}
