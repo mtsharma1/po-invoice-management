@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { dateText, money, qty, text } from '@/lib/format';
+import ActionIcon from './ActionIcon';
 
 const columns = [
   ['POBarcode', 'PO BARCODE', 150],
@@ -92,13 +93,40 @@ export default function ImportWorkbench({ header, rows }) {
 
   return (
     <section className="po-import-access">
+      <div className="po-import-command-card">
+        <div className="po-import-command-heading">
+          <div>
+            <p>Purchase order import</p>
+            <h2>Load an Excel purchase order</h2>
+            <span>Select a workbook, review the header and item rows, then save it to the live database.</span>
+          </div>
+          <span className={`po-import-status ${rows.length ? 'ready' : ''}`}>{rows.length ? `${rows.length} rows ready` : 'Waiting for file'}</span>
+        </div>
+
+        <div className="po-import-actions">
+          <button className="po-import-primary po-import-upload" type="button" onClick={chooseFile} disabled={isPending}>
+            <ActionIcon name="upload" /> {isPending ? 'Importing…' : 'Import PO'}
+          </button>
+          <button className="po-import-save" type="button" onClick={saveToDatabase} disabled={isPending || !rows.length}><ActionIcon name="save" /> Save to database</button>
+          <a className="po-import-template" href="/api/import/template"><ActionIcon name="download" /> Download template</a>
+          <input ref={inputRef} className="hidden-file-input" type="file" accept=".xlsx,.xls" onChange={uploadFile} />
+        </div>
+
+        {fileName ? <div className="po-import-file"><span>Selected workbook</span><strong>{fileName}</strong></div> : null}
+        {message ? <div className="dispatch-message">{message}</div> : null}
+      </div>
+
       <div className="po-import-header-card">
+        <div className="po-import-card-heading">
+          <div><p>Header preview</p><h3>Purchase order details</h3></div>
+          <span>Read from Excel</span>
+        </div>
         <div className="po-import-header-grid">
           <div className="po-import-left-fields">
             <PreviewField label="PO Barcode" value={header?.POBarcode} />
-            <PreviewField label="PO Approved Date" value={dateText(header?.POApprovedDate)} />
+            <PreviewField label="Approved Date" value={dateText(header?.POApprovedDate)} />
             <PreviewField label="Purchase Type" value={header?.PurchaseType} />
-            <PreviewField label="Estimated Delivery Date" value={dateText(header?.EstimatedDeliveryDate)} />
+            <PreviewField label="Delivery Date" value={dateText(header?.EstimatedDeliveryDate)} />
             <PreviewField label="Vendor Name" value={header?.VendorName} />
             <PreviewField label="Vendor GSTIN" value={header?.VendorGSTIN} />
           </div>
@@ -110,15 +138,10 @@ export default function ImportWorkbench({ header, rows }) {
         </div>
       </div>
 
-      <div className="po-import-actions">
-        <button type="button" onClick={chooseFile} disabled={isPending}>Import PO</button>
-        <button type="button" onClick={saveToDatabase} disabled={isPending || !rows.length}>Save To Database</button>
-        <a href="/api/import/template">Open Template</a>
-        <input ref={inputRef} className="hidden-file-input" type="file" accept=".xlsx,.xls" onChange={uploadFile} />
+      <div className="po-import-grid-heading">
+        <div><p>Item preview</p><h3>Imported purchase-order lines</h3></div>
+        <span>{rows.length} {rows.length === 1 ? 'line' : 'lines'}</span>
       </div>
-
-      {fileName ? <div className="po-import-file">Selected File: {fileName}</div> : null}
-      {message ? <div className="dispatch-message">{message}</div> : null}
 
       <div className="po-import-grid-shell">
         <table className="po-import-grid">

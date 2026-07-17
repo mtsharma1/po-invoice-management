@@ -20,7 +20,7 @@ export default async function DispatchPage({ searchParams }) {
 
   return (
     <AppShell>
-      <PageHeader eyebrow="Purchase Order Dispatch" title="Dispatch" />
+      <PageHeader eyebrow="" title="DISPATCH ORDERS" />
       <DataError error={error} />
       <DispatchWorkbench
         poOptions={data.poOptions}

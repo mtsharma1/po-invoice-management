@@ -5,6 +5,7 @@ import PageHeader from '@/components/PageHeader';
 import { dateText, money, qty } from '@/lib/format';
 import { listInvoices } from '@/lib/invoices';
 import { safeData } from '@/lib/safeData';
+import ActionIcon from '@/components/ActionIcon';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,7 @@ export default async function InvoicesPage({ searchParams }) {
             <h2>Customer invoices</h2>
             <span>Search, review and open printable customer invoice records.</span>
           </div>
-          <Link className="invoice-create-link" href="/customer-invoice?new=1">＋ Create invoice</Link>
+          <Link className="invoice-create-link" href="/customer-invoice?new=1"><ActionIcon name="plus" /> Create invoice</Link>
         </div>
 
         <form className="invoice-report-toolbar" method="get">
@@ -42,8 +43,8 @@ export default async function InvoicesPage({ searchParams }) {
             <span>Search invoices</span>
             <input name="search" defaultValue={search} placeholder="Invoice, PO, order or consignee" />
           </label>
-          <button type="submit">Search</button>
-          {search ? <Link href="/invoices">Clear</Link> : null}
+          <button type="submit"><ActionIcon name="search" /> Search</button>
+          {search ? <Link className="invoice-toolbar-clear" href="/invoices"><ActionIcon name="clear" /> Clear</Link> : null}
           <small>{displayRows.length} record{displayRows.length === 1 ? '' : 's'}</small>
         </form>
 
@@ -79,7 +80,7 @@ export default async function InvoicesPage({ searchParams }) {
                   <td className="num"><span className="invoice-line-badge">{qty(row.lineCount)}</span></td>
                   <td className="num">{qty(row.totalQty)}</td>
                   <td className="num">{money(row.taxableAmount)}</td>
-                  <td><Link className="invoice-row-action" href={`/invoices/${encodeURIComponent(row.InvoiceNo)}`}>View →</Link></td>
+                  <td><Link className="invoice-row-action" href={`/invoices/${encodeURIComponent(row.InvoiceNo)}`}>View <ActionIcon name="arrow" /></Link></td>
                 </tr>
               ))}
             </tbody>

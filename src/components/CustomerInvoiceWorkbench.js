@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { dateText } from '@/lib/format';
+import ActionIcon from './ActionIcon';
 
 export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, selectedInvoiceNo, search }) {
   const router = useRouter();
@@ -114,7 +115,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
 
   return (
     <section className="customer-invoice-access">
-      {/* <div className="customer-invoice-title">
+      <div className="customer-invoice-title">
         <div>
           <p>Invoice workspace</p>
           <h2>{form.InvoiceNo ? `Invoice ${form.InvoiceNo}` : 'Create customer invoice'}</h2>
@@ -123,7 +124,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
         <span className={`invoice-record-badge ${form.InvoiceNo ? 'active' : ''}`}>
           <i /> {form.InvoiceNo ? 'Invoice selected' : 'New invoice'}
         </span>
-      </div> */}
+      </div>
 
       <div className="customer-invoice-grid">
         <div className="customer-invoice-left">
@@ -137,12 +138,12 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
                 if (event.key === 'Enter') runMainSearch();
               }}
             />
-            <button className="invoice-search-button" type="button" onClick={runMainSearch}>Search</button>
-            <button className="filter-clear-btn" type="button" onClick={clearMainSearch} title="Clear main form search">Clear</button>
+            <button className="invoice-search-button" type="button" onClick={runMainSearch}><ActionIcon name="search" /> Search</button>
+            <button className="filter-clear-btn" type="button" onClick={clearMainSearch} title="Clear main form search"><ActionIcon name="clear" /> Clear</button>
             {canPrint ? (
-              <a className="access-command export-command" href={exportHref}>↓ Export Excel</a>
+              <a className="access-command export-command" href={exportHref}><ActionIcon name="download" /> Export Excel</a>
             ) : (
-              <button className="access-command export-command" type="button" disabled>↓ Export Excel</button>
+              <button className="access-command export-command" type="button" disabled><ActionIcon name="download" /> Export Excel</button>
             )}
           </div>
 
@@ -178,7 +179,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
 
             <div className="invoice-qr-box">
               <img src={qrSrc} alt="Invoice QR preview" />
-              <button type="button" onClick={generateQR} disabled={isPending}>Refresh QR</button>
+              <button type="button" onClick={generateQR} disabled={isPending}><ActionIcon name="refresh" /> Refresh QR</button>
             </div>
           </div>
 
@@ -231,12 +232,12 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
           </div>
 
           <div className="invoice-action-bar">
-            <button type="button" onClick={addNew}>＋ New invoice</button>
-            <button className="save-invoice-button" type="button" onClick={saveInvoice} disabled={isPending}>{isPending ? 'Saving…' : 'Save invoice'}</button>
+            <button className="invoice-new-button" type="button" onClick={addNew}><ActionIcon name="plus" /> New invoice</button>
+            <button className="save-invoice-button" type="button" onClick={saveInvoice} disabled={isPending}><ActionIcon name="save" /> {isPending ? 'Saving…' : 'Save invoice'}</button>
             {canPrint ? (
-              <Link href={`/invoices/${encodeURIComponent(form.InvoiceNo)}`}>Print preview →</Link>
+              <Link className="invoice-print-button" href={`/invoices/${encodeURIComponent(form.InvoiceNo)}`}><ActionIcon name="print" /> Print preview</Link>
             ) : (
-              <button type="button" disabled>Print preview →</button>
+              <button className="invoice-print-button" type="button" disabled><ActionIcon name="print" /> Print preview</button>
             )}
           </div>
           {message ? <div className="dispatch-message">{message}</div> : null}
@@ -257,8 +258,8 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
                 if (event.key === 'Enter') runListSearch();
               }}
             />
-            <button className="invoice-search-button" type="button" onClick={runListSearch}>Search</button>
-            <button className="filter-clear-btn" type="button" onClick={clearListSearch} title="Clear invoice list search">Clear</button>
+            <button className="invoice-search-button" type="button" onClick={runListSearch}><ActionIcon name="search" /> Search</button>
+            <button className="filter-clear-btn" type="button" onClick={clearListSearch} title="Clear invoice list search"><ActionIcon name="clear" /> Clear</button>
           </div>
           <div className="invoice-list-scroll">
             <table className="mini-list-table">

@@ -18,7 +18,7 @@ export default async function CustomerInvoicePage({ searchParams }) {
 
   return (
     <AppShell>
-      <PageHeader eyebrow="Customer Billing" title="Customer Invoice" />
+      <PageHeader eyebrow="" title="CUSTOMER INVOICES" />
       <DataError error={error} />
       <CustomerInvoiceWorkbench
         rows={data.rows}

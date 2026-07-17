@@ -17,7 +17,7 @@ export default async function ShellOrdersPage({ searchParams }) {
 
   return (
     <AppShell>
-      <PageHeader eyebrow="Shell Order Dispatch" title="Shell Orders" />
+      <PageHeader eyebrow="" title="SHELL ORDERS" />
       <DataError error={error} />
       <ShellOrderWorkbench
         poOptions={data.poOptions}

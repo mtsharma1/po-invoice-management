@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { dateText, qty, text } from '@/lib/format';
+import ActionIcon from './ActionIcon';
 
 export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, rows }) {
   const router = useRouter();
@@ -72,16 +73,16 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
   return (
     <section className="dispatch-workbench shell-order-workbench">
       <div className="dispatch-command-panel">
-        {/* <div className="dispatch-command-heading">
+        <div className="dispatch-command-heading">
           <div>
-            <p>Shell order control</p>
-            <h2>Plan stock allocation</h2>
+            <p>Shell order workspace</p>
+            <h2>Create stock allocation</h2>
             <span>Create shell orders, synchronize stock and review final size-wise quantities.</span>
           </div>
           <span className={`dispatch-mode-badge ${selectedPO ? 'editing' : ''}`}>
             <i /> {selectedPO ? 'Purchase order selected' : 'Awaiting selection'}
           </span>
-        </div> */}
+        </div>
 
         <div className="dispatch-selector-row">
           <label className="dispatch-modern-field dispatch-po-selector">
@@ -111,16 +112,16 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
         <div className="dispatch-action-row shell-action-row">
           <div className="dispatch-action-group">
             <button className="dispatch-action primary" type="button" onClick={() => runPOAction('/api/shell-orders/create')} disabled={isPending}>
-              <span aria-hidden="true">＋</span> Create shell order
+              <ActionIcon name="plus" /> Create shell order
             </button>
-            <button className="dispatch-action secondary" type="button" onClick={() => runPOAction('/api/shell-orders/refresh-stock')} disabled={isPending}>
-              <span aria-hidden="true">↻</span> Refresh stock
+            <button className="dispatch-action secondary view" type="button" onClick={() => runPOAction('/api/shell-orders/refresh-stock')} disabled={isPending}>
+              <ActionIcon name="refresh" /> Refresh stock
             </button>
-            <button className="dispatch-action ghost" type="button" onClick={updateAvailableStock} disabled={isPending}>
-              <span aria-hidden="true">⇄</span> Update available stock
+            <button className="dispatch-action secondary upload" type="button" onClick={updateAvailableStock} disabled={isPending}>
+              <ActionIcon name="sync" /> Update available stock
             </button>
-            <a className="dispatch-action export" href={exportUrl}>
-              <span aria-hidden="true">↓</span> Export to Excel
+            <a className="dispatch-action ghost" href={exportUrl}>
+              <ActionIcon name="download" /> Export to Excel
             </a>
           </div>
           <p className="shell-action-hint">{isPending ? 'Working…' : 'Stock values are synchronized from Tranzact.'}</p>
@@ -170,8 +171,8 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
-              <tr key={row.SOID} className={index === 0 ? 'selected-row' : ''}>
+            {rows.map((row) => (
+              <tr key={row.SOID}>
                 <td>{row.SOID}</td>
                 <td>{row.POID}</td>
                 <td>{row.POBarcode}</td>

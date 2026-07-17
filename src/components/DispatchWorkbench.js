@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { dateText, money, qty, text } from '@/lib/format';
+import ActionIcon from './ActionIcon';
 
 export default function DispatchWorkbench({ poOptions, selectedPO, poContext, rows, mode }) {
   const router = useRouter();
@@ -166,9 +167,9 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
       <div className="dispatch-command-panel">
         <div className="dispatch-command-heading">
           <div>
-            <p>Dispatch control</p>
-            <h2>Prepare your shipment</h2>
-            <span>Select a purchase order, confirm quantities and post it against an invoice.</span>
+            <p>Dispatch workspace</p>
+            <h3>CREATE AND POST DISPATCH</h3>
+            <span>Select a purchase order, prepare item quantities and link the dispatch to an invoice.</span>
           </div>
           <span className={`dispatch-mode-badge ${isEditMode ? 'editing' : ''}`}>
             <i /> {isEditMode ? 'Editing quantities' : selectedPO ? 'View mode' : 'Awaiting selection'}
@@ -202,17 +203,17 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
 
         <div className="dispatch-action-row">
           <div className="dispatch-action-group">
-            <button className="dispatch-action secondary" type="button" onClick={() => runPOAction('/api/dispatch/view', 'view')} disabled={isPending}>
-              <span aria-hidden="true">◉</span> View dispatch
-            </button>
             <button className="dispatch-action primary" type="button" onClick={() => runPOAction('/api/dispatch/create', 'edit')} disabled={isPending}>
-              <span aria-hidden="true">＋</span> Create dispatch
+              <ActionIcon name="plus" /> Create dispatch
             </button>
-            <button className="dispatch-action secondary" type="button" onClick={chooseUploadFile} disabled={isPending}>
-              <span aria-hidden="true">↑</span> Upload Excel
+            <button className="dispatch-action secondary view" type="button" onClick={() => runPOAction('/api/dispatch/view', 'view')} disabled={isPending}>
+              <ActionIcon name="view" /> View existing
+            </button>
+            <button className="dispatch-action secondary upload" type="button" onClick={chooseUploadFile} disabled={isPending}>
+              <ActionIcon name="upload" /> Upload Excel
             </button>
             <a className="dispatch-action ghost" href="/api/dispatch/template">
-              <span aria-hidden="true">↓</span> Template
+              <ActionIcon name="download" /> Download template
             </a>
             <input
               ref={uploadInputRef}
@@ -224,6 +225,10 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
           </div>
 
           <div className="dispatch-post-group">
+            <div className="dispatch-post-copy">
+              <strong>Finalize dispatch</strong>
+              <span>Enter the customer invoice number</span>
+            </div>
             <label className="dispatch-modern-field">
               <span>Invoice number</span>
               <input
@@ -234,7 +239,7 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
               />
             </label>
             <button className="dispatch-post-button" type="button" onClick={postDispatch} disabled={isPending}>
-              {isPending ? 'Working…' : 'Post dispatch'} <span aria-hidden="true">→</span>
+              {isPending ? 'Working…' : 'Post dispatch'} <ActionIcon name="arrow" />
             </button>
           </div>
         </div>
@@ -254,25 +259,25 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
           <table className="dispatch-grid">
           <thead>
             <tr>
-              <th>POID</th>
-              <th>POBarcode</th>
-              <th>StyleId</th>
-              <th>HSNCode</th>
-              <th>VendorArticleName</th>
+              <th>PO ID</th>
+              <th>PO Barcode</th>
+              <th>Style ID</th>
+              <th>HSN Code</th>
+              <th>Vendor Article</th>
               <th>Size</th>
               <th>Colour</th>
               <th>MRP</th>
               <th>Quantity</th>
-              <th>DispatchQty</th>
-              <th>PendingQuantity</th>
-              <th>DispatchDate</th>
-              <th>DispatchNo</th>
-              <th>InvoiceNo</th>
+              <th>Dispatch Qty</th>
+              <th>Pending Qty</th>
+              <th>Dispatch Date</th>
+              <th>Dispatch No.</th>
+              <th>Invoice No.</th>
             </tr>
           </thead>
           <tbody>
             {draftRows.map((row, index) => (
-              <tr key={row.WTDID || `${row.POID}-${index}`} className={index === 0 ? 'selected-row' : ''}>
+              <tr key={row.WTDID || `${row.POID}-${index}`}>
                 <td>{row.POID}</td>
                 <td>{row.POBarcode}</td>
                 <td>{row.StyleId}</td>

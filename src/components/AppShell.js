@@ -1,17 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentSession } from '@/lib/auth';
-
-const nav = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/purchase-orders', label: 'Purchase Orders' },
-  { href: '/dispatch', label: 'Dispatch' },
-  { href: '/shell-orders', label: 'Shell Orders' },
-  { href: '/customer-invoice', label: 'Customer Invoice' },
-  { href: '/invoices', label: 'Invoice Reports' },
-  { href: '/import', label: 'Import' },
-  { href: '/settings', label: 'Settings' },
-];
+import AppNavigation from './AppNavigation';
 
 export default async function AppShell({ children }) {
   const session = await getCurrentSession();
@@ -21,17 +11,13 @@ export default async function AppShell({ children }) {
     <div className="app-frame">
       <aside className="sidebar">
         <Link className="brand" href="/dashboard">
-          <span className="brand-mark">TW</span>
+          <span className="sidebar-menu-glyph" aria-hidden="true">☰</span>
           <span>
-            <strong>Teakwood</strong>
-            <small>PO & Invoice</small>
+            <strong>Procure<span>Desk</span></strong>
+            <small>PO &amp; Invoice Management</small>
           </span>
         </Link>
-        <nav className="nav-list">
-          {nav.map((item) => (
-            <Link href={item.href} key={item.href}>{item.label}</Link>
-          ))}
-        </nav>
+        <AppNavigation />
         <div className="sidebar-session">
           <small>Signed in as</small>
           <strong>{session?.userId || 'User'}</strong>
