@@ -2,39 +2,63 @@ import AppShell from '@/components/AppShell';
 import { DataError } from '@/components/DataState';
 import PageHeader from '@/components/PageHeader';
 import { getDashboardStats } from '@/lib/dashboard';
-import { dateText, qty } from '@/lib/format';
+import { qty } from '@/lib/format';
 import { safeData } from '@/lib/safeData';
 
 export const dynamic = 'force-dynamic';
 
+const emptyCategory = {
+  pendingOrders: 0,
+  dispatchedLastMonth: 0,
+  dispatchAverageLastMonth: 0,
+  daysOrderInHand: 0,
+};
+
 export default async function DashboardPage() {
   const { data, error } = await safeData(getDashboardStats, {
-    purchaseOrders: {},
-    sku: {},
-    dispatch: {},
-    invoices: {},
+    periodLabel: '',
+    suitcase: emptyCategory,
+    backpack: emptyCategory,
   });
 
   return (
     <AppShell>
-      <PageHeader eyebrow="Operations" title="PO & Invoice Command Centre" />
+      <PageHeader eyebrow="OPERATIONS" title="DASHBOARD" />
       <DataError error={error} />
-      <section className="card-grid">
-        <StatCard label="Purchase Orders" value={qty(data.purchaseOrders.totalPOs)} sub={dateText(data.purchaseOrders.lastPODate)} />
-        <StatCard label="SKU Lines" value={qty(data.sku.totalSKUs)} sub={`${qty(data.sku.totalPOQty)} total qty`} />
-        <StatCard label="Dispatch Rows" value={qty(data.dispatch.dispatchRows)} sub={`${qty(data.dispatch.dispatchedQty)} dispatched`} />
-        <StatCard label="Invoices" value={qty(data.invoices.invoices)} sub={dateText(data.invoices.lastInvoiceDate)} />
+      <section className="operations-dashboard">
+        <DashboardCategory title="SuitCase" data={data.suitcase} period={data.periodLabel} accent="blue" />
+        <DashboardCategory title="BackPack" data={data.backpack} period={data.periodLabel} accent="green" />
       </section>
     </AppShell>
   );
 }
 
-function StatCard({ label, value, sub }) {
+function DashboardCategory({ title, data, period, accent }) {
   return (
-    <article className="stat-card">
-      <span>{label}</span>
-      <strong>{value || 0}</strong>
-      <small>{sub || 'No date'}</small>
+    <article className={`dashboard-category ${accent}`}>
+      <header>
+        <div><p>Product category</p><h2>{title}</h2></div>
+        <span>{period || 'Current month'}</span>
+      </header>
+      <div className="dashboard-metric-grid">
+        <Metric label="Total pending orders" value={qty(data.pendingOrders)} note="Pending quantity" tone="pending" />
+        <Metric label="Dispatch average last month" value={numberText(data.dispatchAverageLastMonth)} note={`${qty(data.dispatchedLastMonth)} dispatched in ${period || 'current month'}`} tone="average" />
+        <Metric label="Days order in hand" value={qty(data.daysOrderInHand)} note="At 1,000 units per day" tone="days" />
+      </div>
     </article>
   );
+}
+
+function Metric({ label, value, note, tone }) {
+  return (
+    <div className={`dashboard-metric ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{note}</small>
+    </div>
+  );
+}
+
+function numberText(value) {
+  return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 }

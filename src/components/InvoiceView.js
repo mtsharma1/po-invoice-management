@@ -1,4 +1,5 @@
 import { dateText, dateTimeText, lines as splitLines, money, qty, text } from '@/lib/format';
+import { invoiceQrUrl } from '@/lib/invoiceQr';
 
 export default function InvoiceView({ invoice }) {
   const { header, lines, totals } = invoice;
@@ -14,7 +15,9 @@ export default function InvoiceView({ invoice }) {
           <strong>Ack No. : {text(header.AckNo)}</strong>
           <strong>Ack Date : {dateTimeText(header.AckDate)}</strong>
         </div>
-        <div className="qr-box">QR</div>
+        <div className="qr-box">
+          <img src={invoiceQrUrl(header)} alt={`QR code for invoice ${text(header.InvoiceNo)}`} />
+        </div>
       </div>
 
       <div className="invoice-title boxed heavy">TAX INVOICE</div>
@@ -75,21 +78,16 @@ export default function InvoiceView({ invoice }) {
       </table>
 
       <div className="invoice-summary">
-        <div className="words-strip">{text(header.TotalInWords)}</div>
         <div className="totals-box">
           <div><strong>TOTAL QTY</strong><strong>{qty(totals.totalQty)}</strong></div>
           <div><span>TAXABLE AMOUNT</span><strong>{money(totals.taxableAmount)}</strong></div>
-          {totals.isInterState ? (
-            <div><span>IGST {money(totals.igstRate, 0)}%</span><strong>{money(totals.igstAmount)}</strong></div>
-          ) : (
-            <>
-              <div><span>SGST {money(totals.sgstRate, 0)}%</span><strong>{money(totals.sgstAmount)}</strong></div>
-              <div><span>CGST {money(totals.cgstRate, 0)}%</span><strong>{money(totals.cgstAmount)}</strong></div>
-            </>
-          )}
+          <div><span>IGST {money(totals.igstRate, 0)}%</span><strong>{money(totals.igstAmount)}</strong></div>
+          <div><span>CGST {money(totals.cgstRate, 0)}%</span><strong>{money(totals.cgstAmount)}</strong></div>
+          <div><span>SGST {money(totals.sgstRate, 0)}%</span><strong>{money(totals.sgstAmount)}</strong></div>
           <div><span>ROUND OFF</span><strong>{money(totals.roundOff)}</strong></div>
           <div><strong>GRAND TOTAL</strong><strong>{money(totals.grandTotal)}</strong></div>
         </div>
+        <div className="words-strip">{text(header.TotalInWords)}</div>
       </div>
 
       <footer className="invoice-footer">

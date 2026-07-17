@@ -10,6 +10,7 @@ const paths = {
   save: ['M5 4h12l2 2v14H5z', 'M8 4v6h8V4', 'M8 20v-6h8v6'],
   print: ['M6 9V4h12v5', 'M6 18H4V9h16v9h-2', 'M7 14h10v7H7z'],
   clear: ['M6 6l12 12', 'M18 6 6 18'],
+  reset: ['M4.5 14.5 12 7a2.1 2.1 0 0 1 3 0l2 2a2.1 2.1 0 0 1 0 3l-7 7H6l-1.5-1.5a2.1 2.1 0 0 1 0-3Z', 'M10 19h10'],
 };
 
 export default function ActionIcon({ name }) {

@@ -17,9 +17,10 @@ export async function authenticateUser(userId, password) {
     `SELECT u.ID, u.UserID, u.PWD, u.Access,
             COALESCE(a.AccessDescription, 'User') AS AccessDescription,
             COALESCE(a.AdminPane, 0) AS AdminPane
-       FROM tblUsers u
+      FROM tblUsers u
        LEFT JOIN tblAccessType a ON a.AccessType = u.Access
       WHERE u.UserID = ?
+        AND COALESCE(u.isActive, 1) = 1
       LIMIT 1`,
     [cleanUserId]
   );

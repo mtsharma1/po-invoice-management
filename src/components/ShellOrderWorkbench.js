@@ -76,7 +76,7 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
         <div className="dispatch-command-heading">
           <div>
             <p>Shell order workspace</p>
-            <h2>Create stock allocation</h2>
+            <h2>CREATE STOCK ALLOCATION</h2>
             <span>Create shell orders, synchronize stock and review final size-wise quantities.</span>
           </div>
           <span className={`dispatch-mode-badge ${selectedPO ? 'editing' : ''}`}>
@@ -87,14 +87,16 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
         <div className="dispatch-selector-row">
           <label className="dispatch-modern-field dispatch-po-selector">
             <span>Purchase order</span>
-            <div>
+            <div className="dispatch-po-control-row">
               <select value={selectedPO} onChange={(event) => selectPO(event.target.value)}>
                 <option value="">Select PO Number</option>
                 {poOptions.map((po) => (
                   <option key={po.POBarcode} value={po.POBarcode}>{po.POBarcode}</option>
                 ))}
               </select>
-              {selectedPO ? <button className="dispatch-clear" type="button" onClick={clearFilter} title="Clear purchase order">×</button> : null}
+              <button className="dispatch-po-clear-button" type="button" onClick={clearFilter} disabled={!selectedPO} title="Clear purchase order">
+                <ActionIcon name="reset" /> Clear
+              </button>
             </div>
           </label>
 
@@ -112,13 +114,13 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
         <div className="dispatch-action-row shell-action-row">
           <div className="dispatch-action-group">
             <button className="dispatch-action primary" type="button" onClick={() => runPOAction('/api/shell-orders/create')} disabled={isPending}>
-              <ActionIcon name="plus" /> Create shell order
+              <ActionIcon name="plus" /> Create Shell Order
             </button>
             <button className="dispatch-action secondary view" type="button" onClick={() => runPOAction('/api/shell-orders/refresh-stock')} disabled={isPending}>
-              <ActionIcon name="refresh" /> Refresh stock
+              <ActionIcon name="refresh" /> Refresh Stock
             </button>
             <button className="dispatch-action secondary upload" type="button" onClick={updateAvailableStock} disabled={isPending}>
-              <ActionIcon name="sync" /> Update available stock
+              <ActionIcon name="sync" /> Update Available Stock
             </button>
             <a className="dispatch-action ghost" href={exportUrl}>
               <ActionIcon name="download" /> Export to Excel

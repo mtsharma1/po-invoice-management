@@ -7,3 +7,5 @@ yarn-debug.log*
 yarn-error.log*
 *.xlsx
 .DS_Store
+access-reference/*.txt
+access-reference/*.bas

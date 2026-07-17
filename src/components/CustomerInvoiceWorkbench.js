@@ -4,7 +4,15 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { dateText } from '@/lib/format';
+import { invoiceQrUrl } from '@/lib/invoiceQr';
 import ActionIcon from './ActionIcon';
+
+const defaultBankDetails = {
+  AccountNo: '6811361613',
+  BankName: 'KOTAK MAHINDRA BANK LTD.',
+  BranchName: 'SEC-14, GURGAON',
+  IFSCCode: 'KKBK0000287',
+};
 
 export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, selectedInvoiceNo, search }) {
   const router = useRouter();
@@ -18,7 +26,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
   useEffect(() => {
     setForm(normaliseInvoice(selectedInvoice));
     setMainSearchText(selectedInvoiceNo || selectedInvoice?.InvoiceNo || '');
-    setQrSrc(selectedInvoice?.IRN ? qrUrl(selectedInvoice.IRN) : '/qr.png');
+    setQrSrc(invoiceQrUrl(selectedInvoice?.IRN || selectedInvoice?.InvoiceNo));
   }, [selectedInvoice, selectedInvoiceNo]);
 
   useEffect(() => {
@@ -103,7 +111,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
         });
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || 'QR generation failed.');
-        setQrSrc(qrUrl(form.IRN));
+        setQrSrc(result.qrUrl || invoiceQrUrl(form.IRN || form.InvoiceNo));
         setMessage(result.message || 'QR preview refreshed.');
       } catch (error) {
         setMessage(error.message);
@@ -121,34 +129,22 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
           <h2>{form.InvoiceNo ? `Invoice ${form.InvoiceNo}` : 'Create customer invoice'}</h2>
           <span>Capture invoice references, tax details, addresses and bank information.</span>
         </div>
-        <span className={`invoice-record-badge ${form.InvoiceNo ? 'active' : ''}`}>
-          <i /> {form.InvoiceNo ? 'Invoice selected' : 'New invoice'}
-        </span>
+        <div className="customer-invoice-title-actions">
+          <span className={`invoice-record-badge ${form.InvoiceNo ? 'active' : ''}`}>
+            <i /> {form.InvoiceNo ? 'Invoice selected' : 'New invoice'}
+          </span>
+          {canPrint ? (
+            <a className="access-command export-command" href={exportHref}><ActionIcon name="download" /> Export Excel</a>
+          ) : (
+            <button className="access-command export-command" type="button" disabled><ActionIcon name="download" /> Export Excel</button>
+          )}
+        </div>
       </div>
 
       <div className="customer-invoice-grid">
         <div className="customer-invoice-left">
-          <div className="access-search-row main-search-row">
-            <label>Invoice lookup</label>
-            <input
-              placeholder="Enter invoice number"
-              value={mainSearchText}
-              onChange={(event) => setMainSearchText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') runMainSearch();
-              }}
-            />
-            <button className="invoice-search-button" type="button" onClick={runMainSearch}><ActionIcon name="search" /> Search</button>
-            <button className="filter-clear-btn" type="button" onClick={clearMainSearch} title="Clear main form search"><ActionIcon name="clear" /> Clear</button>
-            {canPrint ? (
-              <a className="access-command export-command" href={exportHref}><ActionIcon name="download" /> Export Excel</a>
-            ) : (
-              <button className="access-command export-command" type="button" disabled><ActionIcon name="download" /> Export Excel</button>
-            )}
-          </div>
-
-          <div className="invoice-section-heading">
-            <div><p>Invoice details</p><span>Primary identifiers and tax configuration</span></div>
+          <div className="invoice-section-heading ">
+            <div><div >Invoice details</div><div>Primary identifiers and tax configuration</div></div>
           </div>
           <div className="invoice-top-panel">
             <div className="invoice-basic-fields">
@@ -184,7 +180,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
           </div>
 
           <div className="invoice-section-heading address-heading">
-            <div><p>Billing &amp; delivery</p><span>Confirm the parties and addresses shown on the invoice</span></div>
+            <div ><p>Billing &amp; delivery</p><span>Confirm the parties and addresses shown on the invoice</span></div>
           </div>
           <div className="invoice-address-grid">
             <AddressBlock
@@ -222,12 +218,12 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
           </div>
 
           <div className="bank-panel">
-            <div className="bank-title">BANK DETAILS</div>
+            <div className="bank-title bg-green-500">BANK DETAILS</div>
             <div className="bank-grid">
-              <FormInput label="AccountNo" value={form.AccountNo} onChange={(value) => updateField('AccountNo', value)} />
-              <FormInput label="BankName" value={form.BankName} onChange={(value) => updateField('BankName', value)} />
-              <FormInput label="BranchName" value={form.BranchName} onChange={(value) => updateField('BranchName', value)} />
-              <FormInput label="IFSCCode" value={form.IFSCCode} onChange={(value) => updateField('IFSCCode', value)} />
+              <FormInput label="Account No." value={form.AccountNo} onChange={(value) => updateField('AccountNo', value)} />
+              <FormInput label="Bank Name" value={form.BankName} onChange={(value) => updateField('BankName', value)} />
+              <FormInput label="Branch Name" value={form.BranchName} onChange={(value) => updateField('BranchName', value)} />
+              <FormInput label="IFSC Code" value={form.IFSCCode} onChange={(value) => updateField('IFSCCode', value)} />
             </div>
           </div>
 
@@ -259,7 +255,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
               }}
             />
             <button className="invoice-search-button" type="button" onClick={runListSearch}><ActionIcon name="search" /> Search</button>
-            <button className="filter-clear-btn" type="button" onClick={clearListSearch} title="Clear invoice list search"><ActionIcon name="clear" /> Clear</button>
+            <button className="filter-clear-btn" type="button" onClick={clearListSearch} title="Clear invoice list search"><ActionIcon name="reset" /> Clear</button>
           </div>
           <div className="invoice-list-scroll">
             <table className="mini-list-table">
@@ -315,7 +311,14 @@ function AddressBlock({ title, addressTitle, name, address, onName, onAddress })
 }
 
 function normaliseInvoice(invoice) {
-  return { ...(invoice || {}) };
+  const normalised = { ...(invoice || {}) };
+  return {
+    ...normalised,
+    AccountNo: normalised.AccountNo || defaultBankDetails.AccountNo,
+    BankName: normalised.BankName || defaultBankDetails.BankName,
+    BranchName: normalised.BranchName || defaultBankDetails.BranchName,
+    IFSCCode: normalised.IFSCCode || defaultBankDetails.IFSCCode,
+  };
 }
 
 function dateInput(value) {
@@ -327,11 +330,4 @@ function dateTimeInput(value) {
   if (!value) return '';
   const raw = String(value).replace(' ', 'T');
   return raw.slice(0, 16);
-}
-
-function qrUrl(value) {
-  const text = String(value || '').trim();
-  return text
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(text)}`
-    : '/qr.png';
 }

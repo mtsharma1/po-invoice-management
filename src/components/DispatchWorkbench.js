@@ -163,7 +163,7 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
   }
 
   return (
-    <section className="dispatch-workbench">
+    <section className="dispatch-workbench dispatch-page-workbench">
       <div className="dispatch-command-panel">
         <div className="dispatch-command-heading">
           <div>
@@ -179,14 +179,16 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
         <div className="dispatch-selector-row">
           <label className="dispatch-modern-field dispatch-po-selector">
             <span>Purchase order</span>
-            <div>
+            <div className="dispatch-po-control-row">
               <select value={selectedPO} onChange={(event) => selectPO(event.target.value)}>
                 <option value="">Select PO Number</option>
                 {poOptions.map((po) => (
                   <option key={po.POBarcode} value={po.POBarcode}>{po.POBarcode}</option>
                 ))}
               </select>
-              {selectedPO ? <button className="dispatch-clear" type="button" onClick={clearFilter} title="Clear purchase order">×</button> : null}
+              <button className="dispatch-po-clear-button" type="button" onClick={clearFilter} disabled={!selectedPO} title="Clear purchase order">
+                <ActionIcon name="reset" /> Clear
+              </button>
             </div>
           </label>
 
@@ -225,10 +227,10 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
           </div>
 
           <div className="dispatch-post-group">
-            <div className="dispatch-post-copy">
+            {/* <div className="dispatch-post-copy">
               <strong>Finalize dispatch</strong>
               <span>Enter the customer invoice number</span>
-            </div>
+            </div> */}
             <label className="dispatch-modern-field">
               <span>Invoice number</span>
               <input

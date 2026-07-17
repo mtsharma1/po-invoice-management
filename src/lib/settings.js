@@ -37,19 +37,85 @@ export async function getWebSettings() {
 }
 
 export async function getSettingsScreenData() {
-  const settings = await getWebSettings();
-  const templates = [
-    { id: 1, templateName: 'Purchase Order', excelTemplate: 'PO Upload Template.xlsx' },
-    { id: 2, templateName: 'Dispatch', excelTemplate: 'Dispatch Upload Template.xlsx' },
-  ];
-  const server = {
-    host: process.env.MYSQL_HOST || '',
-    database: process.env.MYSQL_DATABASE || '',
-    user: process.env.MYSQL_USER || '',
-    port: process.env.MYSQL_PORT || '3306',
-  };
+  const [users, accessTypes] = await Promise.all([
+    query(
+      `SELECT
+         u.ID,
+         u.UserID,
+         u.Access,
+         COALESCE(u.isActive, 1) AS isActive,
+         u.PwdLastChanged,
+         COALESCE(a.AccessDescription, 'User') AS AccessDescription,
+         COALESCE(a.AdminPane, 0) AS AdminPane
+       FROM tblUsers u
+       LEFT JOIN tblAccessType a ON a.AccessType = u.Access
+       ORDER BY u.ID`
+    ),
+    query(
+      `SELECT AccessType, AccessDescription, COALESCE(AdminPane, 0) AS AdminPane
+       FROM tblAccessType
+       ORDER BY AccessType`
+    ),
+  ]);
 
-  return { settings, templates, server };
+  return { users, accessTypes };
+}
+
+export async function saveSettingsUser(payload) {
+  const id = Number(payload?.id || 0);
+  const userId = String(payload?.userId || '').trim();
+  const password = String(payload?.password || '');
+  const access = Number(payload?.access);
+
+  if (!userId) throw new Error('User name is required.');
+  if (!Number.isInteger(access)) throw new Error('Please select an access level.');
+  if (!id && !password) throw new Error('Password is required for a new user.');
+
+  return withTransaction(async (run) => {
+    const accessRows = await run(
+      'SELECT AccessType FROM tblAccessType WHERE AccessType = ? LIMIT 1',
+      [access]
+    );
+    if (!accessRows.length) throw new Error('The selected access level is not valid.');
+
+    const duplicateRows = await run(
+      'SELECT ID FROM tblUsers WHERE UserID = ? AND ID <> ? LIMIT 1',
+      [userId, id]
+    );
+    if (duplicateRows.length) throw new Error('That user name already exists.');
+
+    if (id) {
+      const existingRows = await run('SELECT ID FROM tblUsers WHERE ID = ? LIMIT 1', [id]);
+      if (!existingRows.length) throw new Error('The selected user no longer exists.');
+
+      if (password) {
+        await run(
+          `UPDATE tblUsers
+           SET UserID = ?, PWD = ?, Access = ?, PwdLastChanged = NOW()
+           WHERE ID = ?`,
+          [userId, password, access, id]
+        );
+      } else {
+        await run('UPDATE tblUsers SET UserID = ?, Access = ? WHERE ID = ?', [userId, access, id]);
+      }
+      return { id, message: 'User updated successfully.' };
+    }
+
+    const result = await run(
+      `INSERT INTO tblUsers (UserID, PWD, Access, isActive, PwdLastChanged)
+       VALUES (?, ?, ?, 1, NOW())`,
+      [userId, password, access]
+    );
+    return { id: result.insertId, message: 'User added successfully.' };
+  });
+}
+
+export async function deleteSettingsUser(id) {
+  const userId = Number(id || 0);
+  if (!userId) throw new Error('Please select a user to delete.');
+  const result = await query('DELETE FROM tblUsers WHERE ID = ?', [userId]);
+  if (!result.affectedRows) throw new Error('The selected user no longer exists.');
+  return { message: 'User deleted successfully.' };
 }
 
 export async function saveWebSettings(payload) {

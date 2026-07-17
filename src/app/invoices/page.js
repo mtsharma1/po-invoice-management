@@ -26,17 +26,17 @@ export default async function InvoicesPage({ searchParams }) {
 
   return (
     <AppShell>
-      <PageHeader eyebrow="Billing & Reports" title="Invoice Reports" />
+      <PageHeader eyebrow="BILLINGS & REPORTS" title="Invoice Reports" />
       <DataError error={error} />
       <section className="invoice-report-panel">
-        <div className="invoice-report-heading">
+        {/* <div className="invoice-report-heading">
           <div>
             <p>Invoice archive</p>
-            <h2>Customer invoices</h2>
+            <h2>CUSTOMER INVOICES</h2>
             <span>Search, review and open printable customer invoice records.</span>
           </div>
           <Link className="invoice-create-link" href="/customer-invoice?new=1"><ActionIcon name="plus" /> Create invoice</Link>
-        </div>
+        </div> */}
 
         <form className="invoice-report-toolbar" method="get">
           <label>
@@ -44,7 +44,7 @@ export default async function InvoicesPage({ searchParams }) {
             <input name="search" defaultValue={search} placeholder="Invoice, PO, order or consignee" />
           </label>
           <button type="submit"><ActionIcon name="search" /> Search</button>
-          {search ? <Link className="invoice-toolbar-clear" href="/invoices"><ActionIcon name="clear" /> Clear</Link> : null}
+          {search ? <Link className="invoice-toolbar-clear" href="/invoices"><ActionIcon name="reset" /> Clear</Link> : null}
           <small>{displayRows.length} record{displayRows.length === 1 ? '' : 's'}</small>
         </form>
 

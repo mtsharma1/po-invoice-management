@@ -1,5 +1,5 @@
 import { getCurrentSession } from '@/lib/auth';
-import { saveWebSettings } from '@/lib/settings';
+import { deleteSettingsUser } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ export async function POST(request) {
       return Response.json({ ok: false, error: 'Administrator access is required.' }, { status: 403 });
     }
     const payload = await request.json();
-    const result = await saveWebSettings(payload);
+    const result = await deleteSettingsUser(payload?.id);
     return Response.json({ ok: true, ...result });
   } catch (error) {
     return Response.json({ ok: false, error: error.message }, { status: 400 });

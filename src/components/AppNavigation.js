@@ -14,12 +14,13 @@ const navItems = [
   { href: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
-export default function AppNavigation() {
+export default function AppNavigation({ isAdmin = false }) {
   const pathname = usePathname();
+  const visibleItems = isAdmin ? navItems : navItems.filter((item) => item.href !== '/settings');
 
   return (
     <nav className="nav-list" aria-label="Main navigation">
-      {navItems.map((item) => {
+      {visibleItems.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link className={active ? 'active' : ''} href={item.href} key={item.href}>

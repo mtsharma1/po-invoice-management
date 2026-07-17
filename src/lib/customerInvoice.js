@@ -1,6 +1,13 @@
 import { query, withTransaction } from './db';
 import { getWebSettings } from './settings';
 
+const defaultBankDetails = {
+  AccountNo: '6811361613',
+  BankName: 'KOTAK MAHINDRA BANK LTD.',
+  BranchName: 'SEC-14, GURGAON',
+  IFSCCode: 'KKBK0000287',
+};
+
 const invoiceFields = [
   'InvoiceNo',
   'InvoiceDate',
@@ -143,10 +150,10 @@ function blankInvoice(settings) {
     BuyerName: '',
     BuyerAddress: '',
     BuyerGSTIN: '',
-    AccountNo: settings.accountNo || '',
-    BankName: settings.bankName || '',
-    BranchName: settings.branchName || '',
-    IFSCCode: settings.ifscCode || '',
+    AccountNo: settings.accountNo || defaultBankDetails.AccountNo,
+    BankName: settings.bankName || defaultBankDetails.BankName,
+    BranchName: settings.branchName || defaultBankDetails.BranchName,
+    IFSCCode: settings.ifscCode || defaultBankDetails.IFSCCode,
     TotalInWords: '',
     POBarcode: '',
     SealNo: '',

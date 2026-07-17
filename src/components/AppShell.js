@@ -17,7 +17,7 @@ export default async function AppShell({ children }) {
             <small>PO &amp; Invoice Management</small>
           </span>
         </Link>
-        <AppNavigation />
+        <AppNavigation isAdmin={Boolean(session?.admin)} />
         <div className="sidebar-session">
           <small>Signed in as</small>
           <strong>{session?.userId || 'User'}</strong>

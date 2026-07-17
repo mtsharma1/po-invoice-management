@@ -1,6 +1,5 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { dateText, dateTimeText, money, text } from './format';
+import { dateText, dateTimeText, text } from './format.js';
+import { invoiceQrBuffer } from './invoiceQr.js';
 
 const borderThin = { style: 'thin', color: { argb: 'FF000000' } };
 const borderMedium = { style: 'medium', color: { argb: 'FF000000' } };
@@ -10,6 +9,8 @@ export async function buildInvoiceWorkbook({ header, lines, totals }) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Teakwood PO & Invoice Web';
   workbook.created = new Date();
+  workbook.calcProperties.fullCalcOnLoad = true;
+  workbook.calcProperties.forceFullCalc = true;
 
   const ws = workbook.addWorksheet('Invoice', {
     pageSetup: {
@@ -50,7 +51,7 @@ export async function buildInvoiceWorkbook({ header, lines, totals }) {
     ws.getColumn(key).numFmt = '#,##0.00';
   });
 
-  writeTopBlock(ws, header);
+  await writeTopBlock(ws, header);
   writePartyBlocks(ws, header);
   const itemHeaderRow = 18;
   writeItemHeader(ws, itemHeaderRow);
@@ -66,10 +67,10 @@ export async function buildInvoiceWorkbook({ header, lines, totals }) {
   }
 
   const totalsStart = lastLineRow + 2;
-  writeTotals(ws, totalsStart, totals, header);
-  writeFooter(ws, totalsStart + 7, header);
+  const totalsLayout = writeTotals(ws, totalsStart, totals, header, firstLineRow, lastLineRow);
+  writeFooter(ws, totalsLayout.footerStart, header);
 
-  const printLastRow = totalsStart + 15;
+  const printLastRow = totalsLayout.footerStart + 10;
   ws.pageSetup.printArea = `A1:K${printLastRow}`;
   ws.pageSetup.printTitlesRow = `${itemHeaderRow}:${itemHeaderRow}`;
 
@@ -81,7 +82,7 @@ export async function buildInvoiceWorkbook({ header, lines, totals }) {
   return workbook;
 }
 
-function writeTopBlock(ws, header) {
+async function writeTopBlock(ws, header) {
   mergeValue(ws, 'A1:I1', `IRN : ${text(header.IRN)}`, 'left', true);
   mergeValue(ws, 'A2:I2', `Ack No. : ${text(header.AckNo)}`, 'left', true);
   mergeValue(ws, 'A3:I3', `Ack Date : ${dateTimeText(header.AckDate)}`, 'left', true);
@@ -92,10 +93,14 @@ function writeTopBlock(ws, header) {
   ws.getCell('J1').font = { name: 'Arial', size: 9, bold: true };
   box(ws, 'A1:K4', borderMedium);
 
-  const qrPath = path.join(process.cwd(), 'public', 'qr.png');
-  if (fs.existsSync(qrPath)) {
-    const imageId = ws.workbook.addImage({ filename: qrPath, extension: 'png' });
-    ws.addImage(imageId, 'J1:K4');
+  const qrBuffer = await invoiceQrBuffer(header);
+  if (qrBuffer) {
+    const imageId = ws.workbook.addImage({ buffer: qrBuffer, extension: 'png' });
+    ws.addImage(imageId, {
+      tl: { col: 9.45, row: 0.12 },
+      ext: { width: 88, height: 88 },
+      editAs: 'oneCell',
+    });
     ws.getCell('J1').value = '';
   }
 
@@ -169,63 +174,98 @@ function writeItemLine(ws, rowNumber, line, slNo) {
     cell.font = { name: 'Arial', size: 8, bold: true };
     cell.border = allBorders(borderThin);
   });
+  row.getCell(11).value = {
+    formula: `ROUND(H${rowNumber}*J${rowNumber},2)`,
+    result: Number(line.Amount || 0),
+  };
+  row.getCell(11).numFmt = '#,##0.00';
   row.height = 18;
 }
 
-function writeTotals(ws, startRow, totals, header) {
-  mergeValue(ws, `A${startRow}:G${startRow}`, '', 'left');
-  ws.getCell(`H${startRow}`).value = 'TOTAL QTY';
-  ws.getCell(`I${startRow}`).value = totals.totalQty;
-  ws.getCell(`I${startRow}`).numFmt = '#,##0';
+function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
+  const taxableRow = startRow + 1;
+  const igstRow = startRow + 2;
+  const cgstRow = startRow + 3;
+  const sgstRow = startRow + 4;
+  const roundRow = startRow + 5;
+  const grandRow = startRow + 6;
+  const wordsRow = startRow + 8;
+
+  ws.getCell(`G${startRow}`).value = 'TOTAL QTY';
+  ws.getCell(`G${startRow}`).font = bold();
+  ws.getCell(`H${startRow}`).value = {
+    formula: `SUM(H${firstLineRow}:H${lastLineRow})`,
+    result: Number(totals.totalQty || 0),
+  };
+  ws.getCell(`H${startRow}`).numFmt = '#,##0';
   ws.getCell(`H${startRow}`).font = bold();
-  ws.getCell(`I${startRow}`).font = bold();
 
-  const amountCol = 'J';
-  const valueCol = 'K';
-  setTotalLine(ws, startRow + 1, amountCol, valueCol, 'TAXABLE AMOUNT', totals.taxableAmount);
-  if (totals.isInterState) {
-    setTotalLine(ws, startRow + 2, amountCol, valueCol, `IGST ${money(totals.igstRate, 0)}%`, totals.igstAmount);
-    setTotalLine(ws, startRow + 3, amountCol, valueCol, 'ROUND OFF', totals.roundOff);
-    setTotalLine(ws, startRow + 4, amountCol, valueCol, 'GRAND TOTAL', totals.grandTotal);
-  } else {
-    setTotalLine(ws, startRow + 2, amountCol, valueCol, `SGST ${money(totals.sgstRate, 0)}%`, totals.sgstAmount);
-    setTotalLine(ws, startRow + 3, amountCol, valueCol, `CGST ${money(totals.cgstRate, 0)}%`, totals.cgstAmount);
-    setTotalLine(ws, startRow + 4, amountCol, valueCol, 'ROUND OFF', totals.roundOff);
-    setTotalLine(ws, startRow + 5, amountCol, valueCol, 'GRAND TOTAL', totals.grandTotal);
-  }
+  setFormulaTotalLine(ws, taxableRow, 'TAXABLE AMOUNT', `SUM(K${firstLineRow}:K${lastLineRow})`, totals.taxableAmount);
+  setTaxLine(ws, igstRow, 'IGST', totals.igstRate, totals.isInterState, taxableRow, totals.igstAmount);
+  setTaxLine(ws, cgstRow, 'CGST', totals.cgstRate, !totals.isInterState, taxableRow, totals.cgstAmount);
+  setTaxLine(ws, sgstRow, 'SGST', totals.sgstRate, !totals.isInterState, taxableRow, totals.sgstAmount);
+  setFormulaTotalLine(
+    ws,
+    roundRow,
+    'ROUND OFF',
+    `ROUND(SUM(K${taxableRow}:K${sgstRow}),0)-SUM(K${taxableRow}:K${sgstRow})`,
+    totals.roundOff
+  );
+  setFormulaTotalLine(ws, grandRow, 'GRAND TOTAL', `SUM(K${taxableRow}:K${roundRow})`, totals.grandTotal, true);
 
-  const wordsRow = startRow + 6;
-  mergeValue(ws, `A${wordsRow}:G${wordsRow}`, text(header.TotalInWords), 'center', true);
+  mergeValue(ws, `A${wordsRow}:K${wordsRow}`, text(header.TotalInWords), 'center', true, 9);
+  ws.getCell(`A${wordsRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F3F5' } };
+  ws.getRow(wordsRow).height = 22;
+
+  return { footerStart: wordsRow + 3 };
 }
 
-function setTotalLine(ws, rowNumber, labelCol, valueCol, label, value) {
-  ws.getCell(`${labelCol}${rowNumber}`).value = label;
-  ws.getCell(`${labelCol}${rowNumber}`).font = bold();
-  ws.getCell(`${valueCol}${rowNumber}`).value = Number(value || 0);
-  ws.getCell(`${valueCol}${rowNumber}`).numFmt = '#,##0.00';
-  ws.getCell(`${valueCol}${rowNumber}`).font = bold();
-  ws.getCell(`${valueCol}${rowNumber}`).alignment = { horizontal: 'right' };
-  ws.getCell(`${labelCol}${rowNumber}`).alignment = { horizontal: 'left' };
-  ws.getCell(`${labelCol}${rowNumber}`).border = allBorders(borderThin);
-  ws.getCell(`${valueCol}${rowNumber}`).border = allBorders(borderThin);
+function setFormulaTotalLine(ws, rowNumber, label, formula, result, emphasize = false) {
+  mergeValue(ws, `H${rowNumber}:J${rowNumber}`, label, 'left', true);
+  const valueCell = ws.getCell(`K${rowNumber}`);
+  valueCell.value = { formula, result: Number(result || 0) };
+  valueCell.numFmt = '#,##0.00';
+  valueCell.font = bold();
+  valueCell.alignment = { horizontal: 'right', vertical: 'middle' };
+  valueCell.border = allBorders(emphasize ? borderMedium : borderThin);
+  if (emphasize) box(ws, `H${rowNumber}:K${rowNumber}`, borderMedium);
+}
+
+function setTaxLine(ws, rowNumber, label, rate, applies, taxableRow, amount) {
+  mergeValue(ws, `H${rowNumber}:I${rowNumber}`, label, 'left', true);
+  const rateCell = ws.getCell(`J${rowNumber}`);
+  rateCell.value = Number(rate || 0) / 100;
+  rateCell.numFmt = '0.##%';
+  rateCell.font = bold();
+  rateCell.alignment = { horizontal: 'right', vertical: 'middle' };
+  rateCell.border = allBorders(borderThin);
+
+  const valueCell = ws.getCell(`K${rowNumber}`);
+  valueCell.value = {
+    formula: applies ? `ROUND(K${taxableRow}*J${rowNumber},2)` : '0',
+    result: Number(amount || 0),
+  };
+  valueCell.numFmt = '#,##0.00';
+  valueCell.font = bold();
+  valueCell.alignment = { horizontal: 'right', vertical: 'middle' };
+  valueCell.border = allBorders(borderThin);
 }
 
 function writeFooter(ws, startRow, header) {
-  ws.getCell(`H${startRow}`).value = 'ACCOUNT NO.';
-  ws.getCell(`K${startRow}`).value = text(header.AccountNo);
-  ws.getCell(`H${startRow + 1}`).value = 'BANK NAME';
-  ws.getCell(`K${startRow + 1}`).value = text(header.BankName);
-  ws.getCell(`H${startRow + 2}`).value = 'Branch';
-  ws.getCell(`K${startRow + 2}`).value = text(header.BranchName);
-  ws.getCell(`H${startRow + 3}`).value = 'IFSC CODE';
-  ws.getCell(`K${startRow + 3}`).value = text(header.IFSCCode);
-  for (let row = startRow; row <= startRow + 3; row += 1) {
-    ws.getCell(`H${row}`).font = bold();
-    ws.getCell(`K${row}`).font = bold();
-    ws.getCell(`K${row}`).alignment = { horizontal: 'right' };
-  }
-  mergeValue(ws, `J${startRow + 8}:K${startRow + 8}`, 'FOR TEAKWOOD', 'center', true);
-  mergeValue(ws, `J${startRow + 9}:K${startRow + 9}`, 'AUTH. SIGN', 'center', false);
+  const details = [
+    ['ACCOUNT NO.', header.AccountNo],
+    ['BANK NAME', header.BankName],
+    ['BRANCH', header.BranchName],
+    ['IFSC CODE', header.IFSCCode],
+  ];
+  details.forEach(([label, value], index) => {
+    const row = startRow + index;
+    mergeValue(ws, `H${row}:I${row}`, label, 'left', true);
+    mergeValue(ws, `J${row}:K${row}`, text(value), 'right', true);
+    ws.getCell(`J${row}`).numFmt = '@';
+  });
+  mergeValue(ws, `J${startRow + 9}:K${startRow + 9}`, 'FOR TEAKWOOD', 'center', true);
+  mergeValue(ws, `J${startRow + 10}:K${startRow + 10}`, 'AUTH. SIGN', 'center', false);
 }
 
 function mergeValue(ws, range, value, horizontal = 'left', boldText = false, size = 8) {
