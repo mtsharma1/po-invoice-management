@@ -66,6 +66,7 @@ export async function saveSettingsUser(payload) {
   const userId = String(payload?.userId || '').trim();
   const password = String(payload?.password || '');
   const access = Number(payload?.access);
+  const isActive = String(payload?.isActive ?? '1') === '0' ? 0 : 1;
 
   if (!userId) throw new Error('User name is required.');
   if (!Number.isInteger(access)) throw new Error('Please select an access level.');
@@ -91,20 +92,23 @@ export async function saveSettingsUser(payload) {
       if (password) {
         await run(
           `UPDATE tblUsers
-           SET UserID = ?, PWD = ?, Access = ?, PwdLastChanged = NOW()
+           SET UserID = ?, PWD = ?, Access = ?, isActive = ?, PwdLastChanged = NOW()
            WHERE ID = ?`,
-          [userId, password, access, id]
+          [userId, password, access, isActive, id]
         );
       } else {
-        await run('UPDATE tblUsers SET UserID = ?, Access = ? WHERE ID = ?', [userId, access, id]);
+        await run(
+          'UPDATE tblUsers SET UserID = ?, Access = ?, isActive = ? WHERE ID = ?',
+          [userId, access, isActive, id]
+        );
       }
       return { id, message: 'User updated successfully.' };
     }
 
     const result = await run(
       `INSERT INTO tblUsers (UserID, PWD, Access, isActive, PwdLastChanged)
-       VALUES (?, ?, ?, 1, NOW())`,
-      [userId, password, access]
+       VALUES (?, ?, ?, ?, NOW())`,
+      [userId, password, access, isActive]
     );
     return { id: result.insertId, message: 'User added successfully.' };
   });
@@ -116,6 +120,15 @@ export async function deleteSettingsUser(id) {
   const result = await query('DELETE FROM tblUsers WHERE ID = ?', [userId]);
   if (!result.affectedRows) throw new Error('The selected user no longer exists.');
   return { message: 'User deleted successfully.' };
+}
+
+export async function getSettingsUserPassword(id) {
+  const userId = Number(id || 0);
+  if (!userId) throw new Error('Please select a user.');
+
+  const rows = await query('SELECT PWD FROM tblUsers WHERE ID = ? LIMIT 1', [userId]);
+  if (!rows.length) throw new Error('The selected user no longer exists.');
+  return String(rows[0].PWD || '');
 }
 
 export async function saveWebSettings(payload) {

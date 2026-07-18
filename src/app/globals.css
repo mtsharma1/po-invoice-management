@@ -4530,7 +4530,7 @@ table tbody td,
 .settings-editor-heading h3,
 .settings-users-panel-heading h3 { margin: 0; color: #111827; font-size: 18px; }
 .settings-editor-heading > button { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid #d5dae3; border-radius: 6px; color: #536071; background: #f7f8fa; cursor: pointer; }
-.settings-editor-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 20px; }
+.settings-editor-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 20px; }
 .settings-editor-fields label { display: grid; gap: 7px; }
 .settings-editor-fields label > span { color: #4b5565; font-size: 13px; font-weight: 700; }
 .settings-editor-fields input,
@@ -4546,6 +4546,25 @@ table tbody td,
 .settings-users-table td { height: 50px; padding: 10px 14px; border-bottom: 1px solid #e6e9ef; text-align: left; white-space: nowrap; }
 .settings-user-link { padding: 0; border: 0; color: #4169d8; background: transparent; font-size: 14px; font-weight: 700; cursor: pointer; }
 .settings-password-mask { color: #8891a1; letter-spacing: .11em; }
+.settings-password-cell { display: flex; align-items: center; gap: 9px; min-width: 145px; }
+.settings-password-value { min-width: 82px; color: #27364a; font-weight: 600; letter-spacing: 0; }
+.settings-password-toggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #475569;
+  background: #f8fafc;
+  cursor: pointer;
+}
+.settings-password-toggle:hover { border-color: #9fb5e8; color: #365bb8; background: #eef3ff; }
+.settings-password-toggle:disabled { opacity: .55; cursor: wait; }
+.settings-password-toggle .action-icon { width: 17px; height: 17px; }
 .settings-user-status { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .settings-user-status.active { color: #24704b; background: #e9f7ef; }
 .settings-user-status.inactive { color: #9b4a50; background: #fbecee; }
@@ -5087,10 +5106,10 @@ table thead th,
 
 .customer-invoice-access .invoice-section-heading {
   padding: 10px 14px;
-  border: 1px solid var(--ci-border);
-  border-left: 3px solid #7795e8;
+  border: 1px solid #cbd8ef;
+  border-left: 4px solid #527cf5;
   border-radius: 8px 8px 0 0;
-  background: var(--ci-label-bg);
+  background: linear-gradient(90deg, #e8eefb 0%, #f3f6fc 100%);
 }
 
 .customer-invoice-access .invoice-top-panel {
@@ -5109,6 +5128,14 @@ table thead th,
   font-size: 13px !important;
   font-weight: 600 !important;
   line-height: 18px !important;
+}
+
+.customer-invoice-access .invoice-top-panel .access-field span,
+.customer-invoice-access .invoice-top-panel .invoice-check span {
+  color: #26364d !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: .015em !important;
 }
 
 .customer-invoice-access input,
@@ -5150,7 +5177,9 @@ table thead th,
 }
 
 .customer-invoice-access .invoice-address-grid {
-  gap: 10px;
+  align-items: start;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .customer-invoice-access .invoice-address-block {
@@ -5162,14 +5191,15 @@ table thead th,
 }
 
 .customer-invoice-access .invoice-address-block h3 {
-  padding: 7px 11px;
+  padding: 8px 12px;
   border: 0;
-  border-bottom: 1px solid #e1e6ef;
-  color: #46566d !important;
-  background: var(--ci-label-bg);
+  border-bottom: 1px solid #d8e0ec;
+  color: #26364d !important;
+  background: linear-gradient(90deg, #eef2f7 0%, #f6f8fb 100%);
   font-size: 13px !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
   line-height: 18px !important;
+  letter-spacing: .015em !important;
 }
 
 .customer-invoice-access .invoice-address-block input,
@@ -5180,8 +5210,18 @@ table thead th,
   background: #fff !important;
 }
 
+.customer-invoice-access .invoice-address-block input {
+  height: 40px;
+  padding: 0 12px;
+}
+
 .customer-invoice-access .invoice-address-block textarea {
+  width: 100%;
+  min-height: 104px;
+  padding: 10px 12px;
   border-bottom: 0 !important;
+  overflow: hidden;
+  resize: none;
 }
 
 .customer-invoice-access .bank-panel {

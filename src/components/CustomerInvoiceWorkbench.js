@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { dateText } from '@/lib/format';
 import { invoiceQrUrl } from '@/lib/invoiceQr';
@@ -118,8 +118,8 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
     <section className="customer-invoice-access">
       <div className="customer-invoice-title">
         <div>
-          <h3>Invoice workspace</h3>
-          <h2>{form.InvoiceNo ? `Invoice ${form.InvoiceNo}` : 'Create customer invoice'}</h2>
+          <p>Invoice workspace</p>
+          <h2>{form.InvoiceNo ? `Invoice ${form.InvoiceNo}` : 'CREATE CUSTOMER INVOICE'}</h2>
           <span>Capture invoice references, tax details, addresses and bank information.</span>
         </div>
         <div className="customer-invoice-title-actions">
@@ -137,7 +137,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
       <div className="customer-invoice-grid">
         <div className="customer-invoice-left">
           <div className="invoice-section-heading ">
-            <div><div >Invoice details</div><div>Primary identifiers and tax configuration</div></div>
+            <div><p>Invoice details</p><span>Primary identifiers and tax configuration</span></div>
           </div>
           <div className="invoice-top-panel">
             <div className="invoice-basic-fields">
@@ -298,9 +298,35 @@ function AddressBlock({ title, addressTitle, name, address, onName, onAddress })
       <h3>{title}</h3>
       <input value={name || ''} onChange={(event) => onName(event.target.value)} />
       <h3>{addressTitle}</h3>
-      <textarea value={address || ''} onChange={(event) => onAddress(event.target.value)} />
+      <AutoResizeTextarea value={address} onChange={onAddress} />
     </div>
   );
+}
+
+function AutoResizeTextarea({ value, onChange }) {
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    resizeTextarea(textareaRef.current);
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      rows="3"
+      value={value || ''}
+      onChange={(event) => {
+        resizeTextarea(event.target);
+        onChange(event.target.value);
+      }}
+    />
+  );
+}
+
+function resizeTextarea(textarea) {
+  if (!textarea) return;
+  textarea.style.height = 'auto';
+  textarea.style.height = `${textarea.scrollHeight}px`;
 }
 
 function normaliseInvoice(invoice) {

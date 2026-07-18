@@ -74,11 +74,11 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
     <section className="dispatch-workbench shell-order-workbench">
       <div className="dispatch-command-panel">
         <div className="dispatch-command-heading">
-          <div>
+          {/* <div>
             <p>Shell order workspace</p>
             <h2>CREATE STOCK ALLOCATION</h2>
             <span>Create shell orders, synchronize stock and review final size-wise quantities.</span>
-          </div>
+          </div> */}
           <span className={`dispatch-mode-badge ${selectedPO ? 'editing' : ''}`}>
             <i /> {selectedPO ? 'Purchase order selected' : 'Awaiting selection'}
           </span>

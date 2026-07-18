@@ -9,16 +9,24 @@ export default function SettingsWorkbench({ data }) {
   const router = useRouter();
   const [editor, setEditor] = useState(null);
   const [message, setMessage] = useState('');
+  const [visiblePasswords, setVisiblePasswords] = useState({});
+  const [passwordLoadingId, setPasswordLoadingId] = useState(null);
   const [isPending, startTransition] = useTransition();
 
   function addUser() {
     setMessage('');
-    setEditor({ id: 0, userId: '', password: '', access: String(data.accessTypes[0]?.AccessType ?? '') });
+    setEditor({ id: 0, userId: '', password: '', access: String(data.accessTypes[0]?.AccessType ?? ''), isActive: '1' });
   }
 
   function editUser(user) {
     setMessage('');
-    setEditor({ id: user.ID, userId: user.UserID || '', password: '', access: String(user.Access ?? '') });
+    setEditor({
+      id: user.ID,
+      userId: user.UserID || '',
+      password: '',
+      access: String(user.Access ?? ''),
+      isActive: user.isActive ? '1' : '0',
+    });
   }
 
   function update(field, value) {
@@ -67,6 +75,34 @@ export default function SettingsWorkbench({ data }) {
     });
   }
 
+  async function togglePassword(user) {
+    if (Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID)) {
+      setVisiblePasswords((current) => {
+        const next = { ...current };
+        delete next[user.ID];
+        return next;
+      });
+      return;
+    }
+
+    try {
+      setMessage('');
+      setPasswordLoadingId(user.ID);
+      const response = await fetch('/api/settings/users/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: user.ID }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || 'Password could not be loaded.');
+      setVisiblePasswords((current) => ({ ...current, [user.ID]: result.password }));
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setPasswordLoadingId(null);
+    }
+  }
+
   return (
     <section className="settings-user-workspace">
       <div className="settings-user-heading">
@@ -101,6 +137,13 @@ export default function SettingsWorkbench({ data }) {
                 ))}
               </select>
             </label>
+            <label>
+              <span>Status</span>
+              <select value={editor.isActive} onChange={(event) => update('isActive', event.target.value)}>
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
+            </label>
           </div>
           <div className="settings-editor-actions">
             <button className="settings-save-user" type="button" onClick={saveUser} disabled={isPending}><ActionIcon name="save" /> {isPending ? 'Saving…' : 'Save'}</button>
@@ -124,7 +167,25 @@ export default function SettingsWorkbench({ data }) {
                 <tr key={user.ID}>
                   <td>{user.ID}</td>
                   <td><button className="settings-user-link" type="button" onClick={() => editUser(user)}>{user.UserID}</button></td>
-                  <td><span className="settings-password-mask">••••••••</span></td>
+                  <td>
+                    <div className="settings-password-cell">
+                      <span className={Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID) ? 'settings-password-value' : 'settings-password-mask'}>
+                        {Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID)
+                          ? (visiblePasswords[user.ID] || '(blank)')
+                          : '••••••••'}
+                      </span>
+                      <button
+                        className="settings-password-toggle"
+                        type="button"
+                        onClick={() => togglePassword(user)}
+                        disabled={passwordLoadingId === user.ID}
+                        aria-label={Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID) ? `Hide password for ${user.UserID}` : `Show password for ${user.UserID}`}
+                        title={Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID) ? 'Hide password' : 'Show password'}
+                      >
+                        <ActionIcon name={Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID) ? 'hide' : 'view'} />
+                      </button>
+                    </div>
+                  </td>
                   <td>{user.AccessDescription}</td>
                   <td><span className={`settings-user-status ${user.isActive ? 'active' : 'inactive'}`}>{user.isActive ? 'Active' : 'Inactive'}</span></td>
                   <td>{dateTimeText(user.PwdLastChanged)}</td>

@@ -2,21 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { canAccessFeature, FEATURES } from '@/lib/permissions';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { href: '/purchase-orders', label: 'Purchase Orders', icon: 'orders' },
-  { href: '/shell-orders', label: 'Shell Orders', icon: 'package' },
-  { href: '/dispatch', label: 'Dispatch', icon: 'dispatch' },
-  { href: '/customer-invoice', label: 'Customer Invoice', icon: 'invoice' },
-  { href: '/invoices', label: 'Invoice Reports', icon: 'reports' },
-  { href: '/import', label: 'Import PO', icon: 'import' },
-  { href: '/settings', label: 'Settings', icon: 'settings' },
+  { href: '/dashboard', label: 'Dashboard', icon: 'dashboard', feature: FEATURES.DASHBOARD },
+  { href: '/purchase-orders', label: 'Purchase Orders', icon: 'orders', feature: FEATURES.PURCHASE_ORDERS },
+  { href: '/shell-orders', label: 'Shell Orders', icon: 'package', feature: FEATURES.SHELL_ORDERS },
+  { href: '/dispatch', label: 'Dispatch', icon: 'dispatch', feature: FEATURES.DISPATCH },
+  { href: '/customer-invoice', label: 'Customer Invoice', icon: 'invoice', feature: FEATURES.CUSTOMER_INVOICE },
+  { href: '/invoices', label: 'Invoice Reports', icon: 'reports', feature: FEATURES.INVOICE_REPORTS },
+  { href: '/import', label: 'Import PO', icon: 'import', feature: FEATURES.IMPORT_PO },
+  { href: '/settings', label: 'Settings', icon: 'settings', feature: FEATURES.SETTINGS },
 ];
 
-export default function AppNavigation({ isAdmin = false }) {
+export default function AppNavigation({ session }) {
   const pathname = usePathname();
-  const visibleItems = isAdmin ? navItems : navItems.filter((item) => item.href !== '/settings');
+  const visibleItems = navItems.filter((item) => canAccessFeature(session, item.feature));
 
   return (
     <nav className="nav-list" aria-label="Main navigation">

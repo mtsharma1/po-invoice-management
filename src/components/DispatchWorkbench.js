@@ -166,11 +166,11 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
     <section className="dispatch-workbench dispatch-page-workbench">
       <div className="dispatch-command-panel">
         <div className="dispatch-command-heading">
-          <div>
+          {/* <div>
             <p>Dispatch workspace</p>
             <h3>CREATE AND POST DISPATCH</h3>
             <span>Select a purchase order, prepare item quantities and link the dispatch to an invoice.</span>
-          </div>
+          </div> */}
           <span className={`dispatch-mode-badge ${isEditMode ? 'editing' : ''}`}>
             <i /> {isEditMode ? 'Editing quantities' : selectedPO ? 'View mode' : 'Awaiting selection'}
           </span>
