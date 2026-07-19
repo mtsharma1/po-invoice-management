@@ -782,6 +782,25 @@ table.data-table {
   margin-top: 10px;
 }
 
+.quantity-total-row {
+  display: grid;
+  grid-template-columns: 4% 12% 9% 8% 20% 9% 6% 5% 9% 9% 12%;
+  align-items: center;
+  min-height: 24px;
+}
+
+.quantity-total-row strong {
+  grid-column: 7;
+  text-align: right;
+  padding-right: 8px;
+}
+
+.quantity-total-row span {
+  grid-column: 8;
+  text-align: right;
+  padding-right: 6px;
+}
+
 .words-strip {
   width: 100%;
   padding: 9px 12px;
@@ -796,10 +815,8 @@ table.data-table {
   display: grid;
   width: min(100%, 360px);
   margin-left: auto;
-  border: 1px solid #000;
 }
 
-.totals-box div,
 .bank-box div {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -808,31 +825,70 @@ table.data-table {
 }
 
 .totals-box div {
-  padding: 5px 8px;
-  border-bottom: 1px solid #c8c8c8;
-}
-.totals-box div:last-child {
-  border-bottom: 0;
-  background: #ededed;
-  font-size: 11px;
+  display: grid;
+  grid-template-columns: 1fr 46px 105px;
+  align-items: center;
+  min-height: 23px;
+  text-align: right;
 }
 
-.totals-box strong:last-child,
-.totals-box span:last-child,
+.totals-box div > :last-child {
+  align-self: stretch;
+  display: grid;
+  align-items: center;
+  padding: 2px 6px;
+  border: 1px solid #000;
+  margin-top: -1px;
+}
+
+.totals-box .grand-total {
+  border: 2px solid #000;
+  min-height: 26px;
+}
+
+.totals-box .grand-total > :last-child {
+  border: 0;
+  border-left: 2px solid #000;
+  margin-top: 0;
+}
+
 .bank-box span {
   text-align: right;
 }
 
 .invoice-footer {
   display: grid;
-  grid-template-columns: 1fr 340px 160px;
-  gap: 18px;
+  grid-template-columns: 1fr minmax(360px, 500px);
+  gap: 24px;
   margin-top: 16px;
-  min-height: 130px;
+  min-height: 250px;
+}
+
+.invoice-footer-details {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  min-height: 250px;
+}
+
+.bank-box {
+  justify-self: end;
+  width: min(100%, 320px);
+}
+
+.bank-box div {
+  grid-template-columns: 105px 1fr;
+  gap: 10px;
+}
+
+.bank-box span {
+  text-align: left;
 }
 
 .signature {
   align-self: end;
+  justify-self: end;
+  width: 210px;
   display: grid;
   gap: 10px;
   text-align: center;
@@ -5283,3 +5339,184 @@ table thead th,
   font-weight: 600 !important;
 }
 /* END CUSTOMER INVOICE REDESIGN EXPERIMENT */
+
+/* Simple login page. The previous two-panel page remains available in page.backup.js. */
+.simple-login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 18px;
+  background:
+    radial-gradient(circle at top left, rgba(80, 120, 235, 0.1), transparent 34%),
+    #f4f6fa;
+  color: #161b26;
+}
+
+.simple-login-card {
+  width: min(100%, 430px);
+  padding: 38px;
+  border: 1px solid #dfe4ed;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(28, 38, 59, 0.1);
+}
+
+.simple-login-header {
+  margin-bottom: 28px;
+}
+
+.simple-login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.simple-login-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #4f75e8;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.simple-login-brand > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.simple-login-brand strong {
+  color: #252a36;
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.simple-login-brand strong span {
+  color: #4f75e8;
+}
+
+.simple-login-brand small {
+  color: #6f7787;
+  font-size: 11px;
+}
+
+.simple-login-header h1 {
+  margin: 0;
+  color: #171c27;
+  font-size: 27px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.simple-login-header > p {
+  margin: 8px 0 0;
+  color: #697284;
+  font-size: 14px;
+}
+
+.simple-login-error {
+  margin: 0 0 20px;
+  padding: 11px 13px;
+  border: 1px solid #f1b8bd;
+  border-radius: 9px;
+  background: #fff2f3;
+  color: #a42632;
+  font-size: 13px;
+}
+
+.simple-login-form {
+  display: grid;
+  gap: 19px;
+}
+
+.simple-login-form label {
+  display: grid;
+  gap: 7px;
+  color: #303745;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.simple-login-input {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  border: 1px solid #cfd6e2;
+  border-radius: 9px;
+  background: #fff;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.simple-login-input:focus-within {
+  border-color: #4f75e8;
+  box-shadow: 0 0 0 3px rgba(79, 117, 232, 0.13);
+}
+
+.simple-login-input svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  stroke: #7a8495;
+  stroke-width: 1.7;
+}
+
+.simple-login-input input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #151a24;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.simple-login-input input::placeholder {
+  color: #9ba3b1;
+}
+
+.simple-login-submit {
+  min-height: 46px;
+  margin-top: 3px;
+  border: 0;
+  border-radius: 9px;
+  background: #4f75e8;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.simple-login-submit:hover {
+  background: #3e64d7;
+  box-shadow: 0 9px 20px rgba(79, 117, 232, 0.23);
+  transform: translateY(-1px);
+}
+
+.simple-login-submit:active {
+  transform: translateY(0);
+}
+
+.simple-login-note {
+  margin: 22px 0 0;
+  color: #8a92a0;
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .simple-login-card {
+    padding: 30px 22px;
+    border-radius: 14px;
+  }
+}

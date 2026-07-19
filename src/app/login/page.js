@@ -12,66 +12,43 @@ export default async function LoginPage({ searchParams }) {
     : '/dashboard';
 
   return (
-    <main className="login-page">
-      <div className="login-shell">
-        <section className="login-brand-panel">
-          <div className="login-brand-lockup">
-            <span className="login-brand-mark">TW</span>
+    <main className="simple-login-page">
+      <section className="simple-login-card">
+        <header className="simple-login-header">
+          <div className="simple-login-brand">
+            <span className="simple-login-mark">TW</span>
             <span>
-              <strong>TEAKWOOD</strong>
-              <small>Operations Suite</small>
+              <strong>Procure<span>Desk</span></strong>
+              <small>PO &amp; Invoice Management</small>
             </span>
           </div>
+          <h1>Welcome back</h1>
+          <p>Sign in to continue to your workspace.</p>
+        </header>
 
-          <div className="login-brand-copy">
-            <p className="login-overline">PO &amp; Invoice Management</p>
-            <h1>Every order.<br />One clear view.</h1>
-            <p>Manage purchase orders, stock, dispatch and customer invoices from one secure workspace.</p>
-          </div>
+        {error ? <p className="simple-login-error" role="alert">{error}</p> : null}
 
-          <div className="login-capabilities" aria-label="Application modules">
-            <div><span>01</span><strong>Purchase Orders</strong><small>Import and track</small></div>
-            <div><span>02</span><strong>Dispatch</strong><small>Prepare and post</small></div>
-            <div><span>03</span><strong>Invoices</strong><small>Create and report</small></div>
-          </div>
+        <form className="simple-login-form" action="/api/auth/login" method="post">
+          <input type="hidden" name="next" value={next} />
+          <label>
+            <span>User ID</span>
+            <span className="simple-login-input">
+              <UserIcon />
+              <input name="userId" autoComplete="username" placeholder="Enter your user ID" required autoFocus />
+            </span>
+          </label>
+          <label>
+            <span>Password</span>
+            <span className="simple-login-input">
+              <LockIcon />
+              <input name="password" type="password" autoComplete="current-password" placeholder="Enter your password" required />
+            </span>
+          </label>
+          <button className="simple-login-submit" type="submit">Sign in</button>
+        </form>
 
-          <p className="login-brand-footer"><span /> Secure business workspace</p>
-        </section>
-
-        <section className="login-form-panel">
-          <div className="login-form-wrap">
-            <p className="login-form-kicker">Secure sign in</p>
-            <h2>Welcome back</h2>
-            <p className="login-help">Enter the same credentials you use in the Access application.</p>
-
-            {error ? <p className="login-error" role="alert">{error}</p> : null}
-
-            <form className="login-form" action="/api/auth/login" method="post">
-              <input type="hidden" name="next" value={next} />
-              <label>
-                <span>User ID</span>
-                <span className="login-input-shell">
-                  <UserIcon />
-                  <input name="userId" autoComplete="username" placeholder="Enter your user ID" required autoFocus />
-                </span>
-              </label>
-              <label>
-                <span>Password</span>
-                <span className="login-input-shell">
-                  <LockIcon />
-                  <input name="password" type="password" autoComplete="current-password" placeholder="Enter your password" required />
-                </span>
-              </label>
-              <button className="login-submit" type="submit">
-                <span>Open dashboard</span>
-                <span aria-hidden="true">→</span>
-              </button>
-            </form>
-
-            <p className="login-security-note"><span aria-hidden="true">◆</span> Protected access for authorized users only</p>
-          </div>
-        </section>
-      </div>
+        <p className="simple-login-note">Authorized users only</p>
+      </section>
     </main>
   );
 }
