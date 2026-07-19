@@ -162,7 +162,7 @@ function blankInvoice(settings) {
     SGST: 0,
     CGST: 0,
     IGSTRate: 18,
-    InterStateTax: 1,
+    InterStateTax: 0,
   };
 }
 

@@ -66,7 +66,7 @@ export async function buildInvoiceWorkbook({ header, lines, totals }) {
     applyBorder(ws.getRow(firstLineRow), borderThin);
   }
 
-  const totalsStart = lastLineRow + 2;
+  const totalsStart = lastLineRow + 1;
   const totalsLayout = writeTotals(ws, totalsStart, totals, header, firstLineRow, lastLineRow);
   writeFooter(ws, totalsLayout.footerStart, header);
 
@@ -97,8 +97,18 @@ async function writeTopBlock(ws, header) {
   if (qrBuffer) {
     const imageId = ws.workbook.addImage({ buffer: qrBuffer, extension: 'png' });
     ws.addImage(imageId, {
-      tl: { col: 9.45, row: 0.12 },
-      ext: { width: 88, height: 88 },
+      tl: {
+        nativeCol: 9,
+        nativeColOff: 495300,
+        nativeRow: 0,
+        nativeRowOff: 38100,
+      },
+      br: {
+        nativeCol: 10,
+        nativeColOff: 485775,
+        nativeRow: 3,
+        nativeRowOff: 190500,
+      },
       editAs: 'oneCell',
     });
     ws.getCell('J1').value = '';
@@ -184,12 +194,12 @@ function writeItemLine(ws, rowNumber, line, slNo) {
 
 function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
   const taxableRow = startRow + 1;
-  const igstRow = startRow + 2;
-  const cgstRow = startRow + 3;
-  const sgstRow = startRow + 4;
-  const roundRow = startRow + 5;
-  const grandRow = startRow + 6;
-  const wordsRow = startRow + 8;
+  const firstTaxRow = startRow + 2;
+  const taxRowCount = totals.isInterState ? 2 : 1;
+  const lastTaxRow = firstTaxRow + taxRowCount - 1;
+  const roundRow = lastTaxRow + 1;
+  const grandRow = roundRow + 1;
+  const wordsRow = grandRow + 2;
 
   ws.getCell(`G${startRow}`).value = 'TOTAL QTY';
   ws.getCell(`G${startRow}`).font = bold();
@@ -201,14 +211,17 @@ function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
   ws.getCell(`H${startRow}`).font = bold();
 
   setFormulaTotalLine(ws, taxableRow, 'TAXABLE AMOUNT', `SUM(K${firstLineRow}:K${lastLineRow})`, totals.taxableAmount);
-  setTaxLine(ws, igstRow, 'IGST', totals.igstRate, totals.isInterState, taxableRow, totals.igstAmount);
-  setTaxLine(ws, cgstRow, 'CGST', totals.cgstRate, !totals.isInterState, taxableRow, totals.cgstAmount);
-  setTaxLine(ws, sgstRow, 'SGST', totals.sgstRate, !totals.isInterState, taxableRow, totals.sgstAmount);
+  if (totals.isInterState) {
+    setTaxLine(ws, firstTaxRow, 'CGST', totals.cgstRate, taxableRow, totals.cgstAmount);
+    setTaxLine(ws, firstTaxRow + 1, 'SGST', totals.sgstRate, taxableRow, totals.sgstAmount);
+  } else {
+    setTaxLine(ws, firstTaxRow, 'IGST', totals.igstRate, taxableRow, totals.igstAmount);
+  }
   setFormulaTotalLine(
     ws,
     roundRow,
     'ROUND OFF',
-    `ROUND(SUM(K${taxableRow}:K${sgstRow}),0)-SUM(K${taxableRow}:K${sgstRow})`,
+    `ROUND(SUM(K${taxableRow}:K${lastTaxRow}),0)-SUM(K${taxableRow}:K${lastTaxRow})`,
     totals.roundOff
   );
   setFormulaTotalLine(ws, grandRow, 'GRAND TOTAL', `SUM(K${taxableRow}:K${roundRow})`, totals.grandTotal, true);
@@ -231,7 +244,7 @@ function setFormulaTotalLine(ws, rowNumber, label, formula, result, emphasize = 
   if (emphasize) box(ws, `H${rowNumber}:K${rowNumber}`, borderMedium);
 }
 
-function setTaxLine(ws, rowNumber, label, rate, applies, taxableRow, amount) {
+function setTaxLine(ws, rowNumber, label, rate, taxableRow, amount) {
   mergeValue(ws, `H${rowNumber}:I${rowNumber}`, label, 'left', true);
   const rateCell = ws.getCell(`J${rowNumber}`);
   rateCell.value = Number(rate || 0) / 100;
@@ -242,7 +255,7 @@ function setTaxLine(ws, rowNumber, label, rate, applies, taxableRow, amount) {
 
   const valueCell = ws.getCell(`K${rowNumber}`);
   valueCell.value = {
-    formula: applies ? `ROUND(K${taxableRow}*J${rowNumber},2)` : '0',
+    formula: `ROUND(K${taxableRow}*J${rowNumber},2)`,
     result: Number(amount || 0),
   };
   valueCell.numFmt = '#,##0.00';
@@ -260,21 +273,21 @@ function writeFooter(ws, startRow, header) {
   ];
   details.forEach(([label, value], index) => {
     const row = startRow + index;
-    mergeValue(ws, `H${row}:I${row}`, label, 'left', true);
-    mergeValue(ws, `J${row}:K${row}`, text(value), 'right', true);
+    mergeValue(ws, `H${row}:I${row}`, label, 'left', true, 8, false);
+    mergeValue(ws, `J${row}:K${row}`, text(value), 'right', true, 8, false);
     ws.getCell(`J${row}`).numFmt = '@';
   });
-  mergeValue(ws, `J${startRow + 9}:K${startRow + 9}`, 'FOR TEAKWOOD', 'center', true);
-  mergeValue(ws, `J${startRow + 10}:K${startRow + 10}`, 'AUTH. SIGN', 'center', false);
+  mergeValue(ws, `J${startRow + 9}:K${startRow + 9}`, 'FOR TEAKWOOD', 'center', true, 8, false);
+  mergeValue(ws, `J${startRow + 10}:K${startRow + 10}`, 'AUTH. SIGN', 'center', false, 8, false);
 }
 
-function mergeValue(ws, range, value, horizontal = 'left', boldText = false, size = 8) {
+function mergeValue(ws, range, value, horizontal = 'left', boldText = false, size = 8, withBorder = true) {
   ws.mergeCells(range);
   const cell = ws.getCell(range.split(':')[0]);
   cell.value = value;
   cell.alignment = { horizontal, vertical: 'middle', wrapText: true };
   cell.font = { name: 'Arial', size, bold: boldText };
-  box(ws, range, borderThin);
+  if (withBorder) box(ws, range, borderThin);
 }
 
 function box(ws, range, border) {

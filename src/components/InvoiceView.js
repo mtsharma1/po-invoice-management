@@ -84,9 +84,14 @@ export default function InvoiceView({ invoice }) {
         </div>
         <div className="totals-box">
           <div><strong>TAXABLE AMOUNT</strong><span /><span>{money(totals.taxableAmount)}</span></div>
-          <div><strong>IGST</strong><span>{money(totals.igstRate, 0)}%</span><span>{money(totals.igstAmount)}</span></div>
-          <div><strong>CGST</strong><span>{money(totals.cgstRate, 0)}%</span><span>{money(totals.cgstAmount)}</span></div>
-          <div><strong>SGST</strong><span>{money(totals.sgstRate, 0)}%</span><span>{money(totals.sgstAmount)}</span></div>
+          {totals.isInterState ? (
+            <>
+              <div><strong>CGST</strong><span>{money(totals.cgstRate, 0)}%</span><span>{money(totals.cgstAmount)}</span></div>
+              <div><strong>SGST</strong><span>{money(totals.sgstRate, 0)}%</span><span>{money(totals.sgstAmount)}</span></div>
+            </>
+          ) : (
+            <div><strong>IGST</strong><span>{money(totals.igstRate, 0)}%</span><span>{money(totals.igstAmount)}</span></div>
+          )}
           <div><strong>ROUND OFF</strong><span /><span>{money(totals.roundOff)}</span></div>
           <div className="grand-total"><strong>GRAND TOTAL</strong><span /><strong>{money(totals.grandTotal)}</strong></div>
         </div>

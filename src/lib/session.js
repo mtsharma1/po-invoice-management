@@ -50,7 +50,7 @@ export function sessionCookieOptions(expiresAt) {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, //process.env.NODE_ENV === 'production',
     path: '/',
     expires: new Date(expiresAt),
   };

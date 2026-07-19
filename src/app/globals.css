@@ -784,15 +784,16 @@ table.data-table {
 
 .quantity-total-row {
   display: grid;
-  grid-template-columns: 4% 12% 9% 8% 20% 9% 6% 5% 9% 9% 12%;
+  grid-template-columns: 4fr 12fr 9fr 8fr 17fr 9fr 6fr 5fr 9fr 9fr 12fr;
   align-items: center;
   min-height: 24px;
 }
 
 .quantity-total-row strong {
-  grid-column: 7;
+  grid-column: 6 / 8;
   text-align: right;
   padding-right: 8px;
+  white-space: nowrap;
 }
 
 .quantity-total-row span {
@@ -4602,6 +4603,39 @@ table tbody td,
 .settings-users-table td { height: 50px; padding: 10px 14px; border-bottom: 1px solid #e6e9ef; text-align: left; white-space: nowrap; }
 .settings-user-link { padding: 0; border: 0; color: #4169d8; background: transparent; font-size: 14px; font-weight: 700; cursor: pointer; }
 .settings-password-mask { color: #8891a1; letter-spacing: .11em; }
+.settings-password-cell { display: flex; align-items: center; gap: 10px; }
+.settings-password-toggle {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: #111;
+  background: transparent;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.settings-password-toggle:hover:not(:disabled) {
+  color: #000;
+  background: #f1f3f6;
+}
+.settings-password-toggle:focus-visible {
+  outline: 2px solid #4f75e8;
+  outline-offset: 1px;
+}
+.settings-password-toggle:disabled { opacity: .5; cursor: wait; }
+.settings-eye-icon {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.settings-eye-slash { stroke-width: 1.8; }
 .settings-user-status { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .settings-user-status.active { color: #24704b; background: #e9f7ef; }
 .settings-user-status.inactive { color: #9b4a50; background: #fbecee; }
