@@ -20,13 +20,6 @@ export default async function InvoiceDetailPage({ params }) {
         <PrintButton />
         <Link className="btn" href={`/api/invoices/${encodeURIComponent(decodedInvoiceNo)}/excel`}>Export Excel</Link>
       </PageHeader>
-      <div className="invoice-toolbar">
-        <strong>{decodedInvoiceNo}</strong>
-        <div className="action-row">
-          <Link className="btn secondary" href="/invoices">Back</Link>
-          <Link className="btn" href={`/api/invoices/${encodeURIComponent(decodedInvoiceNo)}/excel`}>Download Excel</Link>
-        </div>
-      </div>
       <DataError error={error} />
       <InvoiceView invoice={data} />
     </AppShell>

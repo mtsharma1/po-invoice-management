@@ -78,29 +78,34 @@ export default function InvoiceView({ invoice }) {
       </table>
 
       <div className="invoice-summary">
+        <div className="quantity-total-row">
+          <strong>TOTAL QTY</strong>
+          <span>{qty(totals.totalQty)}</span>
+        </div>
         <div className="totals-box">
-          <div><strong>TOTAL QTY</strong><strong>{qty(totals.totalQty)}</strong></div>
-          <div><span>TAXABLE AMOUNT</span><strong>{money(totals.taxableAmount)}</strong></div>
-          <div><span>IGST {money(totals.igstRate, 0)}%</span><strong>{money(totals.igstAmount)}</strong></div>
-          <div><span>CGST {money(totals.cgstRate, 0)}%</span><strong>{money(totals.cgstAmount)}</strong></div>
-          <div><span>SGST {money(totals.sgstRate, 0)}%</span><strong>{money(totals.sgstAmount)}</strong></div>
-          <div><span>ROUND OFF</span><strong>{money(totals.roundOff)}</strong></div>
-          <div><strong>GRAND TOTAL</strong><strong>{money(totals.grandTotal)}</strong></div>
+          <div><strong>TAXABLE AMOUNT</strong><span /><span>{money(totals.taxableAmount)}</span></div>
+          <div><strong>IGST</strong><span>{money(totals.igstRate, 0)}%</span><span>{money(totals.igstAmount)}</span></div>
+          <div><strong>CGST</strong><span>{money(totals.cgstRate, 0)}%</span><span>{money(totals.cgstAmount)}</span></div>
+          <div><strong>SGST</strong><span>{money(totals.sgstRate, 0)}%</span><span>{money(totals.sgstAmount)}</span></div>
+          <div><strong>ROUND OFF</strong><span /><span>{money(totals.roundOff)}</span></div>
+          <div className="grand-total"><strong>GRAND TOTAL</strong><span /><strong>{money(totals.grandTotal)}</strong></div>
         </div>
         <div className="words-strip">{text(header.TotalInWords)}</div>
       </div>
 
       <footer className="invoice-footer">
         <div />
-        <div className="bank-box">
-          <div><strong>ACCOUNT NO.</strong><span>{text(header.AccountNo)}</span></div>
-          <div><strong>BANK NAME</strong><span>{text(header.BankName)}</span></div>
-          <div><strong>Branch</strong><span>{text(header.BranchName)}</span></div>
-          <div><strong>IFSC CODE</strong><span>{text(header.IFSCCode)}</span></div>
-        </div>
-        <div className="signature">
-          <strong>FOR TEAKWOOD</strong>
-          <span>AUTH. SIGN</span>
+        <div className="invoice-footer-details">
+          <div className="bank-box">
+            <div><strong>ACCOUNT NO.</strong><span>{text(header.AccountNo)}</span></div>
+            <div><strong>BANK NAME</strong><span>{text(header.BankName)}</span></div>
+            <div><strong>Branch</strong><span>{text(header.BranchName)}</span></div>
+            <div><strong>IFSC CODE</strong><span>{text(header.IFSCCode)}</span></div>
+          </div>
+          <div className="signature">
+            <strong>FOR TEAKWOOD</strong>
+            <span>AUTH. SIGN</span>
+          </div>
         </div>
       </footer>
     </section>

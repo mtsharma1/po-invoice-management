@@ -1,5 +1,6 @@
 import { query } from './db';
 import { asNumber } from './format';
+import { amountInWords } from './numberWords';
 
 const preferredHeaderSql = `
   SELECT h.*
@@ -104,22 +105,38 @@ export async function getInvoice(invoiceNo) {
     [invoiceNo]
   );
 
-  return { header, lines, totals: calculateInvoiceTotals(header, lines) };
+  const totals = calculateInvoiceTotals(header, lines);
+  const storedTotalInWords = String(header.TotalInWords || '').trim();
+  return {
+    header: {
+      ...header,
+      TotalInWords: storedTotalInWords && storedTotalInWords.toUpperCase() !== 'NULL'
+        ? storedTotalInWords
+        : amountInWords(totals.grandTotal),
+    },
+    lines,
+    totals,
+  };
 }
 
 export function calculateInvoiceTotals(header, lines) {
   const totalQty = lines.reduce((sum, line) => sum + asNumber(line.Qty), 0);
   const taxableAmount = lines.reduce((sum, line) => sum + asNumber(line.Amount), 0);
-  const isInterState = Boolean(header?.InterStateTax) || (asNumber(header?.IGSTRate) > 0 && !asNumber(header?.SGST) && !asNumber(header?.CGST));
   const igstRate = asNumber(header?.IGSTRate);
   const sgstRate = asNumber(header?.SGST);
   const cgstRate = asNumber(header?.CGST);
-  const igstAmount = isInterState ? taxableAmount * igstRate / 100 : 0;
-  const sgstAmount = !isInterState ? taxableAmount * sgstRate / 100 : 0;
-  const cgstAmount = !isInterState ? taxableAmount * cgstRate / 100 : 0;
+  const hasInterStateFlag = header?.InterStateTax !== null
+    && header?.InterStateTax !== undefined
+    && header?.InterStateTax !== '';
+  const isInterState = hasInterStateFlag
+    ? asNumber(header.InterStateTax) !== 0 && igstRate > 0
+    : igstRate > 0 && sgstRate === 0 && cgstRate === 0;
+  const igstAmount = isInterState ? roundMoney(taxableAmount * igstRate / 100) : 0;
+  const sgstAmount = !isInterState ? roundMoney(taxableAmount * sgstRate / 100) : 0;
+  const cgstAmount = !isInterState ? roundMoney(taxableAmount * cgstRate / 100) : 0;
   const rawGrandTotal = taxableAmount + igstAmount + sgstAmount + cgstAmount;
   const grandTotal = Math.round(rawGrandTotal);
-  const roundOff = grandTotal - rawGrandTotal;
+  const roundOff = roundMoney(grandTotal - rawGrandTotal);
 
   return {
     totalQty,
@@ -134,6 +151,10 @@ export function calculateInvoiceTotals(header, lines) {
     roundOff,
     grandTotal,
   };
+}
+
+function roundMoney(value) {
+  return Math.round((asNumber(value) + Number.EPSILON) * 100) / 100;
 }
 
 function emptyTotals() {
