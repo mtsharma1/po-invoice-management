@@ -182,7 +182,7 @@ export default function SettingsWorkbench({ data }) {
                         aria-label={Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID) ? `Hide password for ${user.UserID}` : `Show password for ${user.UserID}`}
                         title={Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID) ? 'Hide password' : 'Show password'}
                       >
-                        <ActionIcon name={Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID) ? 'hide' : 'view'} />
+                        <PasswordVisibilityIcon hidden={Object.prototype.hasOwnProperty.call(visiblePasswords, user.ID)} />
                       </button>
                     </div>
                   </td>
@@ -201,6 +201,16 @@ export default function SettingsWorkbench({ data }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function PasswordVisibilityIcon({ hidden }) {
+  return (
+    <svg className="settings-eye-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none">
+      <path d="M2.06 12.35a1 1 0 0 1 0-.7A10.75 10.75 0 0 1 12 5c4.48 0 8.35 2.62 9.94 6.65a1 1 0 0 1 0 .7A10.75 10.75 0 0 1 12 19c-4.48 0-8.35-2.62-9.94-6.65Z" />
+      <circle cx="12" cy="12" r="3" />
+      {hidden ? <path className="settings-eye-slash" d="M3 3l18 18" /> : null}
+    </svg>
   );
 }
 

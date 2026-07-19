@@ -32,6 +32,16 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function updateInterStateTax(checked) {
+    setForm((current) => ({
+      ...current,
+      InterStateTax: checked ? 1 : 0,
+      SGST: checked ? 9 : 0,
+      CGST: checked ? 9 : 0,
+      IGSTRate: checked ? 0 : 18,
+    }));
+  }
+
   function runMainSearch() {
     const params = new URLSearchParams();
     if (mainSearchText.trim()) params.set('invoiceNo', mainSearchText.trim());
@@ -160,7 +170,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
                 <input
                   type="checkbox"
                   checked={Boolean(form.InterStateTax)}
-                  onChange={(event) => updateField('InterStateTax', event.target.checked ? 1 : 0)}
+                  onChange={(event) => updateInterStateTax(event.target.checked)}
                 />
                 <span>Inter State Tax</span>
               </label>
@@ -330,7 +340,20 @@ function resizeTextarea(textarea) {
 }
 
 function normaliseInvoice(invoice) {
-  return { ...(invoice || {}) };
+  const source = invoice || {};
+  const useCgstSgst = Number(source.InterStateTax || 0) !== 0;
+  return {
+    ...source,
+    InterStateTax: useCgstSgst ? 1 : 0,
+    SGST: useCgstSgst ? positiveRate(source.SGST, 9) : 0,
+    CGST: useCgstSgst ? positiveRate(source.CGST, 9) : 0,
+    IGSTRate: useCgstSgst ? 0 : positiveRate(source.IGSTRate, 18),
+  };
+}
+
+function positiveRate(value, fallback) {
+  const rate = Number(value || 0);
+  return Number.isFinite(rate) && rate > 0 ? rate : fallback;
 }
 
 function dateInput(value) {

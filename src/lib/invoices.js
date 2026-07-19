@@ -122,18 +122,13 @@ export async function getInvoice(invoiceNo) {
 export function calculateInvoiceTotals(header, lines) {
   const totalQty = lines.reduce((sum, line) => sum + asNumber(line.Qty), 0);
   const taxableAmount = lines.reduce((sum, line) => sum + asNumber(line.Amount), 0);
-  const igstRate = asNumber(header?.IGSTRate);
-  const sgstRate = asNumber(header?.SGST);
-  const cgstRate = asNumber(header?.CGST);
-  const hasInterStateFlag = header?.InterStateTax !== null
-    && header?.InterStateTax !== undefined
-    && header?.InterStateTax !== '';
-  const isInterState = hasInterStateFlag
-    ? asNumber(header.InterStateTax) !== 0 && igstRate > 0
-    : igstRate > 0 && sgstRate === 0 && cgstRate === 0;
-  const igstAmount = isInterState ? roundMoney(taxableAmount * igstRate / 100) : 0;
-  const sgstAmount = !isInterState ? roundMoney(taxableAmount * sgstRate / 100) : 0;
-  const cgstAmount = !isInterState ? roundMoney(taxableAmount * cgstRate / 100) : 0;
+  const isInterState = asNumber(header?.InterStateTax) !== 0;
+  const igstRate = isInterState ? 0 : positiveRate(header?.IGSTRate, 18);
+  const sgstRate = isInterState ? positiveRate(header?.SGST, 9) : 0;
+  const cgstRate = isInterState ? positiveRate(header?.CGST, 9) : 0;
+  const igstAmount = !isInterState ? roundMoney(taxableAmount * igstRate / 100) : 0;
+  const sgstAmount = isInterState ? roundMoney(taxableAmount * sgstRate / 100) : 0;
+  const cgstAmount = isInterState ? roundMoney(taxableAmount * cgstRate / 100) : 0;
   const rawGrandTotal = taxableAmount + igstAmount + sgstAmount + cgstAmount;
   const grandTotal = Math.round(rawGrandTotal);
   const roundOff = roundMoney(grandTotal - rawGrandTotal);
@@ -155,6 +150,11 @@ export function calculateInvoiceTotals(header, lines) {
 
 function roundMoney(value) {
   return Math.round((asNumber(value) + Number.EPSILON) * 100) / 100;
+}
+
+function positiveRate(value, fallback) {
+  const rate = asNumber(value);
+  return rate > 0 ? rate : fallback;
 }
 
 function emptyTotals() {
