@@ -13,7 +13,7 @@ export default async function AppShell({ children }) {
         <Link className="brand" href="/dashboard">
           <span className="sidebar-menu-glyph" aria-hidden="true">☰</span>
           <span>
-            <strong>Procure<span>Desk</span></strong>
+            <strong>Teakwood<span>Leathers</span></strong>
             <small>PO &amp; Invoice Management</small>
           </span>
         </Link>

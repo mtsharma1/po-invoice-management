@@ -19,12 +19,14 @@ const accessFeatures = Object.freeze({
 
 const pathFeatures = [
   ['/api/settings', FEATURES.SETTINGS],
+  ['/api/master', FEATURES.PURCHASE_ORDERS],
   ['/api/customer-invoice', FEATURES.CUSTOMER_INVOICE],
   ['/api/shell-orders', FEATURES.SHELL_ORDERS],
   ['/api/dispatch', FEATURES.DISPATCH],
   ['/api/invoices', FEATURES.INVOICE_REPORTS],
   ['/api/import', FEATURES.IMPORT_PO],
   ['/purchase-orders', FEATURES.PURCHASE_ORDERS],
+  ['/master', FEATURES.PURCHASE_ORDERS],
   ['/customer-invoice', FEATURES.CUSTOMER_INVOICE],
   ['/shell-orders', FEATURES.SHELL_ORDERS],
   ['/dashboard', FEATURES.DASHBOARD],
