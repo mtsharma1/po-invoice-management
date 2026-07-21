@@ -248,7 +248,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
         <aside className="customer-invoice-right">
           <div className="invoice-list-title">
             <div><p>Recent records</p><strong>Invoice list</strong></div>
-            <span>{rows.length}</span>
+            {/* <span>{rows.length}</span> */}
           </div>
           <div className="access-search-row invoice-list-search-row">
             <label>Filter</label>

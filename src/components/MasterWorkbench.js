@@ -125,10 +125,10 @@ export default function MasterWorkbench({ data, selectedPO }) {
           <h1>MASTER DATA REGISTER</h1>
           <span>Review and maintain the complete PO item record used by Shell Orders, Dispatch and Invoices.</span>
         </div>
-        <div className="master-heading-metrics">
-          <span><small>Records shown</small><strong>{data.rows.length.toLocaleString('en-IN')}</strong></span>
-          <span><small>Purchase orders</small><strong>{data.purchaseOrders.length.toLocaleString('en-IN')}</strong></span>
-        </div>
+          {/* <div className="master-heading-metrics">
+            <span><small>Records shown</small><strong>{data.rows.length.toLocaleString('en-IN')}</strong></span>
+            <span><small>Purchase orders</small><strong>{data.purchaseOrders.length.toLocaleString('en-IN')}</strong></span>
+          </div> */}
       </header>
 
       <div className="master-toolbar">
@@ -138,7 +138,8 @@ export default function MasterWorkbench({ data, selectedPO }) {
             <option value="">All purchase orders</option>
             {data.purchaseOrders.map((po) => (
               <option key={po.POBarcode} value={po.POBarcode}>
-                {po.POBarcode} · {Number(po.lineCount).toLocaleString('en-IN')} lines
+                {po.POBarcode}
+                {/* {po.POBarcode} · {Number(po.lineCount).toLocaleString('en-IN')} lines */}
               </option>
             ))}
           </select>
@@ -154,7 +155,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
             <>
               <small>Selected purchase order</small>
               <strong>{selectedPO}</strong>
-              <span>{Number(selectedSummary?.lineCount || 0).toLocaleString('en-IN')} item lines · {Number(selectedSummary?.totalQty || 0).toLocaleString('en-IN')} units</span>
+              {/* <span>{Number(selectedSummary?.lineCount || 0).toLocaleString('en-IN')} item lines · {Number(selectedSummary?.totalQty || 0).toLocaleString('en-IN')} units</span> */}
             </>
           ) : (
             <><small>Current view</small><strong>All PO records</strong><span>Select a PO to filter or delete it.</span></>
@@ -196,7 +197,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
       <section className="master-table-panel">
         <div className="master-table-title">
           <div><p>Access record source</p><h2>{selectedPO ? 'Filtered PO details' : 'All PO details'}</h2></div>
-          <span>{data.totalRows.toLocaleString('en-IN')} record{data.totalRows === 1 ? '' : 's'}</span>
+          {/* <span>{data.totalRows.toLocaleString('en-IN')} record{data.totalRows === 1 ? '' : 's'}</span> */}
         </div>
         {data.totalRows > data.rowLimit ? <p className="master-limit-note">Showing the first {data.rowLimit.toLocaleString('en-IN')} records. Select a PO Barcode to see its complete record set.</p> : null}
         <div className="master-table-wrap">

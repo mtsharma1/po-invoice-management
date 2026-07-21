@@ -875,11 +875,30 @@ table.data-table {
 .bank-box {
   justify-self: end;
   width: min(100%, 320px);
+  border: 1px solid #000;
 }
 
 .bank-box div {
   grid-template-columns: 105px 1fr;
-  gap: 10px;
+  gap: 0;
+  padding: 0;
+  border-bottom: 1px solid #000;
+}
+
+.bank-box div:last-child {
+  border-bottom: 0;
+}
+
+.bank-box strong,
+.bank-box span {
+  display: grid;
+  align-items: center;
+  min-height: 23px;
+  padding: 3px 7px;
+}
+
+.bank-box strong {
+  border-right: 1px solid #000;
 }
 
 .bank-box span {
@@ -891,8 +910,21 @@ table.data-table {
   justify-self: end;
   width: 210px;
   display: grid;
-  gap: 10px;
+  gap: 0;
+  border: 1px solid #000;
   text-align: center;
+}
+
+.signature strong,
+.signature span {
+  display: grid;
+  place-items: center;
+  min-height: 25px;
+  padding: 4px 8px;
+}
+
+.signature strong {
+  border-bottom: 1px solid #000;
 }
 
 .dispatch-workbench {

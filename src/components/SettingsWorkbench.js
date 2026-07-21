@@ -157,7 +157,7 @@ export default function SettingsWorkbench({ data }) {
       <div className="settings-users-panel">
         <div className="settings-users-panel-heading">
           <div><p>User record source</p><h3>Application users</h3></div>
-          <span>{data.users.length} user{data.users.length === 1 ? '' : 's'}</span>
+          {/* <span>{data.users.length} user{data.users.length === 1 ? '' : 's'}</span> */}
         </div>
         <div className="settings-users-table-wrap">
           <table className="settings-users-table">

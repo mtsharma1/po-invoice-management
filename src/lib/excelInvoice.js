@@ -277,8 +277,10 @@ function writeFooter(ws, startRow, header) {
     mergeValue(ws, `J${row}:K${row}`, text(value), 'right', true, 8, false);
     ws.getCell(`J${row}`).numFmt = '@';
   });
+  box(ws, `H${startRow}:K${startRow + 3}`, borderThin);
   mergeValue(ws, `J${startRow + 9}:K${startRow + 9}`, 'FOR TEAKWOOD', 'center', true, 8, false);
   mergeValue(ws, `J${startRow + 10}:K${startRow + 10}`, 'AUTH. SIGN', 'center', false, 8, false);
+  box(ws, `J${startRow + 9}:K${startRow + 10}`, borderThin);
 }
 
 function mergeValue(ws, range, value, horizontal = 'left', boldText = false, size = 8, withBorder = true) {

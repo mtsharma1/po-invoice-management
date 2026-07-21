@@ -45,7 +45,7 @@ export default async function InvoicesPage({ searchParams }) {
           </label>
           <button type="submit"><ActionIcon name="search" /> Search</button>
           {search ? <Link className="invoice-toolbar-clear" href="/invoices"><ActionIcon name="reset" /> Clear</Link> : null}
-          <small>{displayRows.length} record{displayRows.length === 1 ? '' : 's'}</small>
+          {/* <small>{displayRows.length} record{displayRows.length === 1 ? '' : 's'}</small> */}
         </form>
 
         {!displayRows.length && !error ? (

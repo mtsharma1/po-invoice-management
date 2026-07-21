@@ -138,7 +138,7 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
             <p>Stock allocation lines</p>
             <h3>{selectedPO || 'No purchase order selected'}</h3>
           </div>
-          <span>{rows.length} item{rows.length === 1 ? '' : 's'}</span>
+          {/* <span>{rows.length} item{rows.length === 1 ? '' : 's'}</span> */}
         </div>
         <div className="dispatch-grid-shell shell-order-grid-shell">
           <table className="dispatch-grid shell-order-grid">
