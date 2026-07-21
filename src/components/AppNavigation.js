@@ -6,6 +6,7 @@ import { canAccessFeature, FEATURES } from '@/lib/permissions';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: 'dashboard', feature: FEATURES.DASHBOARD },
+  { href: '/master', label: 'Master', icon: 'master', feature: FEATURES.PURCHASE_ORDERS },
   { href: '/purchase-orders', label: 'Purchase Orders', icon: 'orders', feature: FEATURES.PURCHASE_ORDERS },
   { href: '/shell-orders', label: 'Shell Orders', icon: 'package', feature: FEATURES.SHELL_ORDERS },
   { href: '/dispatch', label: 'Dispatch', icon: 'dispatch', feature: FEATURES.DISPATCH },
@@ -37,6 +38,7 @@ export default function AppNavigation({ session }) {
 function NavIcon({ name }) {
   const paths = {
     dashboard: ['M4 4h6v6H4z', 'M14 4h6v6h-6z', 'M4 14h6v6H4z', 'M14 14h6v6h-6z'],
+    master: ['M4 5h16v14H4z', 'M4 10h16', 'M9 5v14', 'M14 5v14'],
     orders: ['M7 4h10v3H7z', 'M5 6h14v15H5z', 'M8 11h8', 'M8 15h8'],
     dispatch: ['M3 6h11v10H3z', 'M14 10h4l3 3v3h-7z', 'M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z', 'M17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z'],
     package: ['M4 7l8-4 8 4-8 4z', 'M4 7v10l8 4 8-4V7', 'M12 11v10'],

@@ -92,7 +92,7 @@ export async function getInvoiceHeaderForForm(invoiceNo = '') {
      LIMIT 1`,
     [invoiceNo]
   );
-  return rows[0] || blankInvoice(settings);
+  return rows[0] ? applyDefaultBankDetails(rows[0]) : blankInvoice(settings);
 }
 
 export async function saveCustomerInvoice(payload) {
@@ -100,6 +100,8 @@ export async function saveCustomerInvoice(payload) {
   if (!invoiceNo) throw new Error('Invoice No is required.');
 
   const invoiceId = Number(payload?.InvoiceID || 0);
+  const invoice = applyDefaultBankDetails(payload);
+  const savedBankDetails = pickBankDetails(invoice);
   return withTransaction(async (run) => {
     const duplicateRows = await run(
       `SELECT InvoiceID
@@ -113,11 +115,11 @@ export async function saveCustomerInvoice(payload) {
       throw new Error('This invoice number already exists. Please use a different Invoice No.');
     }
 
-    const values = invoiceFields.map((field) => normaliseField(field, payload?.[field]));
+    const values = invoiceFields.map((field) => normaliseField(field, invoice?.[field]));
     if (invoiceId) {
       const setSql = invoiceFields.map((field) => `${field} = ?`).join(', ');
       await run(`UPDATE tblInvoiceHeader SET ${setSql} WHERE InvoiceID = ?`, [...values, invoiceId]);
-      return { invoiceId, invoiceNo, message: 'Invoice saved successfully.' };
+      return { invoiceId, invoiceNo, bankDetails: savedBankDetails, message: 'Invoice saved successfully.' };
     }
 
     const placeholders = invoiceFields.map(() => '?').join(', ');
@@ -126,7 +128,7 @@ export async function saveCustomerInvoice(payload) {
        VALUES (${placeholders})`,
       values
     );
-    return { invoiceId: result.insertId, invoiceNo, message: 'Invoice created successfully.' };
+    return { invoiceId: result.insertId, invoiceNo, bankDetails: savedBankDetails, message: 'Invoice created successfully.' };
   });
 }
 
@@ -150,10 +152,10 @@ function blankInvoice(settings) {
     BuyerName: '',
     BuyerAddress: '',
     BuyerGSTIN: '',
-    AccountNo: settings.accountNo || defaultBankDetails.AccountNo,
-    BankName: settings.bankName || defaultBankDetails.BankName,
-    BranchName: settings.branchName || defaultBankDetails.BranchName,
-    IFSCCode: settings.ifscCode || defaultBankDetails.IFSCCode,
+    AccountNo: defaultIfBlank(settings.accountNo, defaultBankDetails.AccountNo),
+    BankName: defaultIfBlank(settings.bankName, defaultBankDetails.BankName),
+    BranchName: defaultIfBlank(settings.branchName, defaultBankDetails.BranchName),
+    IFSCCode: defaultIfBlank(settings.ifscCode, defaultBankDetails.IFSCCode),
     TotalInWords: '',
     POBarcode: '',
     SealNo: '',
@@ -164,6 +166,31 @@ function blankInvoice(settings) {
     IGSTRate: 18,
     InterStateTax: 0,
   };
+}
+
+function applyDefaultBankDetails(invoice = {}) {
+  return {
+    ...invoice,
+    AccountNo: defaultIfBlank(invoice.AccountNo, defaultBankDetails.AccountNo),
+    BankName: defaultIfBlank(invoice.BankName, defaultBankDetails.BankName),
+    BranchName: defaultIfBlank(invoice.BranchName, defaultBankDetails.BranchName),
+    IFSCCode: defaultIfBlank(invoice.IFSCCode, defaultBankDetails.IFSCCode),
+  };
+}
+
+function pickBankDetails(invoice) {
+  return {
+    AccountNo: invoice.AccountNo,
+    BankName: invoice.BankName,
+    BranchName: invoice.BranchName,
+    IFSCCode: invoice.IFSCCode,
+  };
+}
+
+function defaultIfBlank(value, fallback) {
+  if (value === null || value === undefined) return fallback;
+  const text = String(value).trim();
+  return !text || ['null', 'undefined'].includes(text.toLowerCase()) ? fallback : text;
 }
 
 function normaliseField(field, value) {

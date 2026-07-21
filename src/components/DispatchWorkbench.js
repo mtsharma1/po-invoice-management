@@ -255,7 +255,7 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
             <p>Shipment lines</p>
             <h3>{selectedPO || 'No purchase order selected'}</h3>
           </div>
-          <span>{isEditMode ? 'Edit DispatchQty and press Enter to save' : `${draftRows.length} item${draftRows.length === 1 ? '' : 's'}`}</span>
+          {/* <span>{isEditMode ? 'Edit DispatchQty and press Enter to save' : `${draftRows.length} item${draftRows.length === 1 ? '' : 's'}`}</span> */}
         </div>
         <div className="dispatch-grid-shell">
           <table className="dispatch-grid">

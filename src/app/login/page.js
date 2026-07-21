@@ -18,7 +18,7 @@ export default async function LoginPage({ searchParams }) {
           <div className="simple-login-brand">
             <span className="simple-login-mark">TW</span>
             <span>
-              <strong>Procure<span>Desk</span></strong>
+              <strong>Teakwood<span>Leathers</span></strong>
               <small>PO &amp; Invoice Management</small>
             </span>
           </div>

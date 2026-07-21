@@ -176,13 +176,17 @@ export async function saveStagedPurchaseOrder(sessionId) {
       [sessionId]
     );
 
+    const dispatchSchedule = await assignFactoryDispatchDates(run);
+
     await run('DELETE FROM webTmpPODetails WHERE SessionId = ?', [sessionId]);
     await run('DELETE FROM webTmpPOHeaders WHERE SessionId = ?', [sessionId]);
 
     return {
       poBarcode: header.POBarcode,
       savedRows: detailCount,
-      message: `PO ${header.POBarcode} saved to database.`,
+      assignedDispatchRows: dispatchSchedule.assignedRows,
+      dispatchDateBatches: dispatchSchedule.dateBatches,
+      message: `PO ${header.POBarcode} saved to database. Factory dispatch dates assigned to ${dispatchSchedule.assignedRows} line${dispatchSchedule.assignedRows === 1 ? '' : 's'}.`,
     };
   });
 }
@@ -207,12 +211,113 @@ export async function importPurchaseOrderWorkbook(fileBuffer) {
       [details.map((row) => detailColumns.map((column) => row[column] ?? null))]
     );
 
+    const dispatchSchedule = await assignFactoryDispatchDates(run);
+
     return {
       poBarcode: header.POBarcode,
       insertedRows: details.length,
-      message: `Import completed for PO: ${header.POBarcode}`,
+      assignedDispatchRows: dispatchSchedule.assignedRows,
+      dispatchDateBatches: dispatchSchedule.dateBatches,
+      message: `Import completed for PO: ${header.POBarcode}. Factory dispatch dates assigned to ${dispatchSchedule.assignedRows} line${dispatchSchedule.assignedRows === 1 ? '' : 's'}.`,
     };
   });
+}
+
+export async function assignFactoryDispatchDates(run = query) {
+  const latestRows = await run(
+    `SELECT DATE(FactoryDispatchDate) AS LastDate
+     FROM tblPODetails
+     WHERE FactoryDispatchDate IS NOT NULL
+     ORDER BY FactoryDispatchDate DESC, POID DESC
+     LIMIT 1
+     FOR UPDATE`
+  );
+
+  let currentDate;
+  let cumulativeQty = 0;
+  const lastAssignedDate = sqlDateKey(latestRows[0]?.LastDate);
+
+  if (lastAssignedDate) {
+    currentDate = lastAssignedDate;
+    const quantities = await run(
+      `SELECT POID, COALESCE(Quantity, 0) AS Quantity
+       FROM tblPODetails
+       WHERE FactoryDispatchDate >= ?
+         AND FactoryDispatchDate < DATE_ADD(?, INTERVAL 1 DAY)
+       ORDER BY POID
+       FOR UPDATE`,
+      [lastAssignedDate, lastAssignedDate]
+    );
+    cumulativeQty = quantities.reduce((total, row) => total + Number(row.Quantity || 0), 0);
+  } else {
+    currentDate = getNextWorkingDate(addDays(indiaDateKey(), 1));
+  }
+
+  const unassignedRows = await run(
+    `SELECT POID, COALESCE(Quantity, 0) AS Quantity
+     FROM tblPODetails
+     WHERE FactoryDispatchDate IS NULL
+     ORDER BY POID ASC
+     FOR UPDATE`
+  );
+
+  const dateGroups = new Map();
+  for (const row of unassignedRows) {
+    const rowQty = Number(row.Quantity || 0);
+    if (cumulativeQty + rowQty > 1000) {
+      currentDate = getNextWorkingDate(addDays(currentDate, 1));
+      cumulativeQty = 0;
+    }
+
+    cumulativeQty += rowQty;
+    const ids = dateGroups.get(currentDate) || [];
+    ids.push(Number(row.POID));
+    dateGroups.set(currentDate, ids);
+  }
+
+  for (const [dispatchDate, poids] of dateGroups) {
+    await run(
+      `UPDATE tblPODetails
+       SET FactoryDispatchDate = ?
+       WHERE POID IN (${poids.map(() => '?').join(', ')})`,
+      [dispatchDate, ...poids]
+    );
+  }
+
+  return {
+    assignedRows: unassignedRows.length,
+    dateBatches: dateGroups.size,
+  };
+}
+
+function indiaDateKey() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function sqlDateKey(value) {
+  if (!value) return '';
+  return String(value).slice(0, 10);
+}
+
+function addDays(dateKey, days) {
+  const [year, month, day] = String(dateKey).split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()]
+    .map((value, index) => String(value).padStart(index === 0 ? 4 : 2, '0'))
+    .join('-');
+}
+
+function getNextWorkingDate(dateKey) {
+  const [year, month, day] = String(dateKey).split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCDay() === 0 ? addDays(dateKey, 1) : dateKey;
 }
 
 export async function ensureWebImportTables(run = query) {
