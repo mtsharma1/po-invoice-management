@@ -95,6 +95,9 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
         });
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || 'Save failed.');
+        if (result.bankDetails) {
+          setForm((current) => ({ ...current, ...result.bankDetails }));
+        }
         setMessage(result.message || 'Invoice saved.');
         router.push(`/customer-invoice?invoiceNo=${encodeURIComponent(result.invoiceNo)}`);
         router.refresh();

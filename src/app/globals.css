@@ -5372,6 +5372,15 @@ table thead th,
   font-size: 13px !important;
   font-weight: 600 !important;
 }
+
+/* Stronger Customer Invoice label contrast. */
+.customer-invoice-access .access-field span,
+.customer-invoice-access .access-search-row label,
+.customer-invoice-access .invoice-check span,
+.customer-invoice-access .invoice-address-block h3 {
+  color: #1f2937 !important;
+  font-weight: 650 !important;
+}
 /* END CUSTOMER INVOICE REDESIGN EXPERIMENT */
 
 /* Simple login page. The previous two-panel page remains available in page.backup.js. */
