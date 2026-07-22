@@ -814,8 +814,10 @@ table.data-table {
 
 .totals-box {
   display: grid;
-  width: min(100%, 360px);
+  width: min(100%, 300px);
   margin-left: auto;
+  border-top: 1px solid #000;
+  border-left: 1px solid #000;
 }
 
 .bank-box div {
@@ -833,24 +835,22 @@ table.data-table {
   text-align: right;
 }
 
-.totals-box div > :last-child {
+.totals-box div > * {
   align-self: stretch;
   display: grid;
   align-items: center;
   padding: 2px 6px;
-  border: 1px solid #000;
-  margin-top: -1px;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
 }
 
-.totals-box .grand-total {
-  border: 2px solid #000;
+.tax-box {
+  border: 1px solid #000;
   min-height: 26px;
 }
 
-.totals-box .grand-total > :last-child {
-  border: 0;
-  border-left: 2px solid #000;
-  margin-top: 0;
+.totals-box .grand-total {
+  min-height: 26px;
 }
 
 .bank-box span {
@@ -5134,6 +5134,18 @@ table thead th,
 
   .invoice-lines tr {
     break-inside: avoid;
+  }
+
+  .totals-box {
+    border-top: 1px solid #000 !important;
+    border-left: 1px solid #000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .totals-box > div > * {
+    border-right: 1px solid #000 !important;
+    border-bottom: 1px solid #000 !important;
   }
 }
 

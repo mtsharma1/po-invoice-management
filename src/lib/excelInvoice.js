@@ -240,8 +240,8 @@ function setFormulaTotalLine(ws, rowNumber, label, formula, result, emphasize = 
   valueCell.numFmt = '#,##0.00';
   valueCell.font = bold();
   valueCell.alignment = { horizontal: 'right', vertical: 'middle' };
-  valueCell.border = allBorders(emphasize ? borderMedium : borderThin);
-  if (emphasize) box(ws, `H${rowNumber}:K${rowNumber}`, borderMedium);
+  valueCell.border = allBorders(borderThin);
+  if (emphasize) box(ws, `H${rowNumber}:K${rowNumber}`, borderThin);
 }
 
 function setTaxLine(ws, rowNumber, label, rate, taxableRow, amount) {
