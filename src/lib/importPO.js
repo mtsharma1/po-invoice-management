@@ -1,4 +1,5 @@
 import { query, withTransaction } from './db';
+import { ensurePOImportDateColumn } from './poSchema';
 
 const headerColumns = [
   'POBarcode',
@@ -141,6 +142,8 @@ export async function stagePurchaseOrderWorkbook(sessionId, fileBuffer) {
 }
 
 export async function saveStagedPurchaseOrder(sessionId) {
+  await ensurePOImportDateColumn();
+
   return withTransaction(async (run) => {
     await ensureWebImportTables(run);
     const headers = await run('SELECT * FROM webTmpPOHeaders WHERE SessionId = ? LIMIT 1', [sessionId]);
@@ -160,8 +163,8 @@ export async function saveStagedPurchaseOrder(sessionId) {
     if (!detailCount) throw new Error('No imported SKU rows found to save.');
 
     await run(
-      `INSERT INTO tblPOHeaders (${headerColumns.join(', ')})
-       SELECT ${headerColumns.join(', ')}
+      `INSERT INTO tblPOHeaders (${headerColumns.join(', ')}, POImportDate)
+       SELECT ${headerColumns.join(', ')}, CURRENT_TIMESTAMP
        FROM webTmpPOHeaders
        WHERE SessionId = ?`,
       [sessionId]
@@ -193,6 +196,8 @@ export async function saveStagedPurchaseOrder(sessionId) {
 
 export async function importPurchaseOrderWorkbook(fileBuffer) {
   const { header, details } = await parsePurchaseOrderWorkbook(fileBuffer);
+  await ensurePOImportDateColumn();
+
   return withTransaction(async (run) => {
     const existing = await run('SELECT POBarcode FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1', [header.POBarcode]);
     if (existing.length) {
@@ -200,8 +205,8 @@ export async function importPurchaseOrderWorkbook(fileBuffer) {
     }
 
     await run(
-      `INSERT INTO tblPOHeaders (${headerColumns.join(', ')})
-       VALUES (${headerColumns.map(() => '?').join(', ')})`,
+      `INSERT INTO tblPOHeaders (${headerColumns.join(', ')}, POImportDate)
+       VALUES (${headerColumns.map(() => '?').join(', ')}, CURRENT_TIMESTAMP)`,
       headerColumns.map((column) => header[column] ?? null)
     );
 

@@ -7,6 +7,7 @@ import ActionIcon from './ActionIcon';
 const columns = [
   ['POID', 'POID'],
   ['POBarcode', 'PO Barcode'],
+  ['POImportDate', 'PO import date'],
   ['StyleId', 'Style ID'],
   ['SKUCode', 'SKU Code'],
   ['HSNCode', 'HSN Code'],
@@ -225,6 +226,14 @@ function numericField(field) {
 
 function displayValue(field, value) {
   if (value === null || value === undefined || value === '') return '—';
+  if (field === 'POImportDate') {
+    const raw = String(value).replace('T', ' ');
+    const date = raw.slice(0, 10);
+    const time = raw.slice(11, 16);
+    const [year, month, day] = date.split('-');
+    if (year && month && day) return `${day}-${month}-${year}${time ? ` ${time}` : ''}`;
+    return String(value);
+  }
   if (['EstimatedDeliveryDate', 'FactoryDispatchDate'].includes(field)) {
     const raw = String(value).slice(0, 10);
     const [year, month, day] = raw.split('-');

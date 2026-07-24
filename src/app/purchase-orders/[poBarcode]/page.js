@@ -1,7 +1,7 @@
 import AppShell from '@/components/AppShell';
 import { DataError, EmptyState } from '@/components/DataState';
 import PageHeader from '@/components/PageHeader';
-import { dateText, money, qty, text } from '@/lib/format';
+import { dateText, dateTimeText, money, qty, text } from '@/lib/format';
 import { getPurchaseOrder } from '@/lib/purchaseOrders';
 import { safeData } from '@/lib/safeData';
 
@@ -19,7 +19,7 @@ export default async function PurchaseOrderDetailPage({ params }) {
       {!data.header && !error ? <EmptyState title="PO not found" /> : null}
       {data.header ? (
         <section className="panel">
-          <p><strong>Vendor:</strong> {text(data.header.VendorName)} | <strong>GSTIN:</strong> {text(data.header.VendorGSTIN)} | <strong>Approved:</strong> {dateText(data.header.POApprovedDate)}</p>
+          <p><strong>Vendor:</strong> {text(data.header.VendorName)} | <strong>GSTIN:</strong> {text(data.header.VendorGSTIN)} | <strong>Approved:</strong> {dateText(data.header.POApprovedDate)} | <strong>Imported:</strong> {dateTimeText(data.header.POImportDate)}</p>
           <div className="table-wrap">
             <table className="data-table">
               <thead>

@@ -1,4 +1,5 @@
 import { query, withTransaction } from './db';
+import { ensurePOImportDateColumn } from './poSchema';
 
 const editableLineFields = Object.freeze({
   StyleId: 'StyleId',
@@ -19,6 +20,8 @@ const editableLineFields = Object.freeze({
 });
 
 export async function getMasterScreenData(poBarcode = '') {
+  await ensurePOImportDateColumn();
+
   const selectedPO = String(poBarcode || '').trim();
   const where = selectedPO ? 'WHERE d.POBarcode = ?' : '';
   const params = selectedPO ? [selectedPO] : [];
@@ -41,6 +44,7 @@ export async function getMasterScreenData(poBarcode = '') {
       `SELECT
          d.POID,
          d.POBarcode,
+         h.POImportDate,
          d.StyleId,
          d.SKUCode,
          d.HSNCode,

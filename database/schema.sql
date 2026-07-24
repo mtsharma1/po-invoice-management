@@ -37,8 +37,10 @@ CREATE TABLE IF NOT EXISTS tblPOHeaders (
   VendorAddress TEXT NULL,
   Party VARCHAR(100) NULL,
   CreatedOn DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  POImportDate DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (POBarcode),
   INDEX IX_POApprovedDate (POApprovedDate),
+  INDEX IX_POImportDate (POImportDate),
   INDEX IX_EstimatedDeliveryDate (EstimatedDeliveryDate),
   INDEX IX_VendorName (VendorName),
   INDEX IX_VendorGSTIN (VendorGSTIN)

@@ -4542,7 +4542,31 @@ table tbody td,
 .dashboard-metric small { display: block; margin-top: 11px; color: #778091; font-size: 12px; }
 .dashboard-metric.pending { --metric-accent: #4f79ee; background: #f7f9ff; }
 .dashboard-metric.average { --metric-accent: #2f9d69; background: #f4fbf7; }
-.dashboard-metric.days { --metric-accent: #d08a27; background: #fffaf0; }
+.dashboard-metric.days {
+  border-top: 3px solid var(--metric-accent);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease, background-color 180ms ease;
+}
+.dashboard-metric.days-critical {
+  --metric-accent: #c81e1e;
+  background: #fecdd3;
+}
+.dashboard-metric.days-warning {
+  --metric-accent: #d96808;
+  background: #fed7aa;
+}
+.dashboard-metric.days-healthy {
+  --metric-accent: #16824c;
+  background: #bbf7d0;
+}
+.dashboard-metric.days-critical > span,
+.dashboard-metric.days-critical strong { color: #a81414; }
+.dashboard-metric.days-critical small { color: #7f1d1d; }
+.dashboard-metric.days-warning > span,
+.dashboard-metric.days-warning strong { color: #a84c08; }
+.dashboard-metric.days-warning small { color: #7c3a08; }
+.dashboard-metric.days-healthy > span,
+.dashboard-metric.days-healthy strong { color: #156c42; }
+.dashboard-metric.days-healthy small { color: #185b3d; }
 
 @keyframes dashboard-card-enter {
   from { opacity: 0; transform: translateY(16px) scale(.992); }
