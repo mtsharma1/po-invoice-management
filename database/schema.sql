@@ -71,6 +71,14 @@ CREATE TABLE IF NOT EXISTS webSettings (
   PRIMARY KEY (SettingKey)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS webIntegrations (
+  IntegrationKey VARCHAR(100) NOT NULL,
+  SecretValue LONGTEXT NOT NULL,
+  MetadataJson LONGTEXT NULL,
+  UpdatedAt DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (IntegrationKey)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS webFileTemplates (
   TemplateKey VARCHAR(100) NOT NULL,
   FileName VARCHAR(255) NOT NULL,
@@ -124,6 +132,8 @@ CREATE TABLE IF NOT EXISTS tblPODetails (
   FactoryDispatchDate DATETIME NULL,
   VendorPrefix VARCHAR(4) NULL,
   AvailableStock INT NULL DEFAULT 0,
+  path_display VARCHAR(1024) NULL,
+  ImageUrl VARCHAR(2048) NULL,
   PRIMARY KEY (POID),
   INDEX IX_POBarcode (POBarcode),
   INDEX IX_SKUCode (SKUCode),

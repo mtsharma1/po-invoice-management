@@ -12,6 +12,7 @@ const emptyCategory = {
   dispatchedLastMonth: 0,
   dispatchAverageLastMonth: 0,
   daysOrderInHand: 0,
+  yesterdayDispatch: 0,
 };
 
 export default async function DashboardPage() {
@@ -44,13 +45,14 @@ function DashboardCategory({ title, data, period, accent }) {
       </header>
       <div className="dashboard-metric-grid">
         <Metric label="Total pending orders" value={qty(data.pendingOrders)} note="Pending quantity" tone="pending" />
-        <Metric label="Dispatch average last month" value={numberText(data.dispatchAverageLastMonth)} note={`${qty(data.dispatchedLastMonth)} dispatched in ${period || 'current month'}`} tone="average" />
         <Metric
           label="Days order in hand"
           value={qty(data.daysOrderInHand)}
           note="At 1,000 units per day"
           tone={`days days-${daysTone}`}
         />
+        <Metric label="Dispatch average last month" value={numberText(data.dispatchAverageLastMonth)} note={`${qty(data.dispatchedLastMonth)} dispatched in ${period || 'last month'}`} tone="average" />
+        <Metric label="Yesterday dispatch" value={qty(data.yesterdayDispatch)} note="Previous calendar day" tone="yesterday" />
       </div>
     </article>
   );

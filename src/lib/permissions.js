@@ -18,6 +18,7 @@ const accessFeatures = Object.freeze({
 });
 
 const pathFeatures = [
+  ['/api/dropbox', FEATURES.SETTINGS],
   ['/api/settings', FEATURES.SETTINGS],
   ['/api/master', FEATURES.PURCHASE_ORDERS],
   ['/api/customer-invoice', FEATURES.CUSTOMER_INVOICE],

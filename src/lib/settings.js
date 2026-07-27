@@ -1,4 +1,5 @@
 import { query, withTransaction } from './db';
+import { getDropboxConnectionStatus } from './dropbox';
 
 const defaultSettings = {
   accountNo: '6811361613',
@@ -37,7 +38,7 @@ export async function getWebSettings() {
 }
 
 export async function getSettingsScreenData() {
-  const [users, accessTypes] = await Promise.all([
+  const [users, accessTypes, dropbox] = await Promise.all([
     query(
       `SELECT
          u.ID,
@@ -56,9 +57,10 @@ export async function getSettingsScreenData() {
        FROM tblAccessType
        ORDER BY AccessType`
     ),
+    getDropboxConnectionStatus(),
   ]);
 
-  return { users, accessTypes };
+  return { users, accessTypes, dropbox };
 }
 
 export async function saveSettingsUser(payload) {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import ActionIcon from './ActionIcon';
 
-export default function SettingsWorkbench({ data }) {
+export default function SettingsWorkbench({ data, feedback = {} }) {
   const router = useRouter();
   const [editor, setEditor] = useState(null);
   const [message, setMessage] = useState('');
@@ -153,6 +153,53 @@ export default function SettingsWorkbench({ data }) {
       ) : null}
 
       {message ? <div className="dispatch-message settings-message"><span aria-hidden="true">i</span>{message}</div> : null}
+
+      <div className="settings-dropbox-panel">
+        <div className="settings-dropbox-copy">
+          <div className="settings-dropbox-mark" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div>
+            <p>Cloud image source</p>
+            <h3>Dropbox connection</h3>
+            <span>
+              {data.dropbox?.connected
+                ? 'Connected with offline access. Access tokens will refresh automatically.'
+                : 'Authorize Dropbox once to store a secure refresh token for product-image access.'}
+            </span>
+            {data.dropbox?.connectedAt ? (
+              <small>
+                Connected {dateTimeText(data.dropbox.connectedAt)}
+                {data.dropbox.connectedBy ? ` by ${data.dropbox.connectedBy}` : ''}
+              </small>
+            ) : null}
+          </div>
+        </div>
+        <div className="settings-dropbox-actions">
+          <span className={`settings-dropbox-status ${data.dropbox?.connected ? 'connected' : ''}`}>
+            {data.dropbox?.connected ? 'Connected' : data.dropbox?.configured ? 'Not connected' : 'Setup required'}
+          </span>
+          {data.dropbox?.configured ? (
+            <a className="settings-dropbox-connect" href="/api/dropbox/oauth/start">
+              {data.dropbox?.connected ? 'Reconnect Dropbox' : 'Connect Dropbox'}
+            </a>
+          ) : (
+            <span className="settings-dropbox-config-note">Add Dropbox environment variables</span>
+          )}
+        </div>
+      </div>
+
+      {feedback.dropboxConnected ? (
+        <div className="settings-dropbox-feedback success">
+          Dropbox connected successfully. The refresh token is stored encrypted.
+        </div>
+      ) : null}
+      {feedback.dropboxError ? (
+        <div className="settings-dropbox-feedback error">{feedback.dropboxError}</div>
+      ) : null}
 
       <div className="settings-users-panel">
         <div className="settings-users-panel-heading">

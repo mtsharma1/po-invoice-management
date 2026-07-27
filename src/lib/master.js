@@ -1,5 +1,6 @@
 import { query, withTransaction } from './db';
-import { ensurePOImportDateColumn } from './poSchema';
+import { findDropboxImage } from './dropbox';
+import { ensurePODetailImageColumns, ensurePOImportDateColumn } from './poSchema';
 
 const editableLineFields = Object.freeze({
   StyleId: 'StyleId',
@@ -17,10 +18,12 @@ const editableLineFields = Object.freeze({
   LandingPrice: 'LandingPrice',
   EstimatedDeliveryDate: 'EstimatedDeliveryDate',
   FactoryDispatchDate: 'FactoryDispatchDate',
+  path_display: 'path_display',
+  ImageUrl: 'ImageUrl',
 });
 
 export async function getMasterScreenData(poBarcode = '') {
-  await ensurePOImportDateColumn();
+  await Promise.all([ensurePOImportDateColumn(), ensurePODetailImageColumns()]);
 
   const selectedPO = String(poBarcode || '').trim();
   const where = selectedPO ? 'WHERE d.POBarcode = ?' : '';
@@ -61,7 +64,15 @@ export async function getMasterScreenData(poBarcode = '') {
          d.EstimatedDeliveryDate,
          h.BillTo,
          h.ShipTo,
-         d.FactoryDispatchDate
+         CASE
+           WHEN LOWER(COALESCE(h.ShipTo, '')) REGEXP 'delhi|haryana' THEN 1
+           WHEN LOWER(COALESCE(h.ShipTo, '')) REGEXP 'uttar[[:space:].-]*pradesh|(^|[^a-z])u[.]?[[:space:]]*p[.]?([^a-z]|$)|rajasthan' THEN 2
+           WHEN LOWER(COALESCE(h.ShipTo, '')) REGEXP 'maharash?tra|mumbai' THEN 5
+           ELSE 7
+         END AS DeliveryDuration,
+         d.FactoryDispatchDate,
+         d.path_display,
+         d.ImageUrl
        FROM tblPODetails d
        INNER JOIN tblPOHeaders h ON h.POBarcode = d.POBarcode
        ${where}
@@ -80,6 +91,7 @@ export async function getMasterScreenData(poBarcode = '') {
 }
 
 export async function saveMasterLine(payload) {
+  await ensurePODetailImageColumns();
   const poid = Number(payload?.POID || 0);
   if (!Number.isInteger(poid) || poid <= 0) throw new Error('A valid PO line is required.');
 
@@ -113,6 +125,106 @@ export async function saveMasterLine(payload) {
   });
 }
 
+export async function fetchAndSaveMasterLineImage(payload) {
+  await ensurePODetailImageColumns();
+  const poid = Number(payload?.POID || 0);
+  if (!Number.isInteger(poid) || poid <= 0) throw new Error('A valid PO line is required.');
+
+  const rows = await query(
+    `SELECT VendorArticleName, VendorArticleNumber, StyleId, SKUCode
+     FROM tblPODetails
+     WHERE POID = ?
+     LIMIT 1`,
+    [poid]
+  );
+  if (!rows.length) throw new Error('The selected PO line no longer exists.');
+
+  const productName = String(
+    payload?.productName ||
+    rows[0].VendorArticleName ||
+    rows[0].VendorArticleNumber ||
+    rows[0].StyleId ||
+    rows[0].SKUCode ||
+    ''
+  ).trim();
+  const image = await findDropboxImage(productName);
+
+  const vendorArticleName = String(rows[0].VendorArticleName || '').trim();
+  const updateResult = vendorArticleName
+    ? await query(
+        `UPDATE tblPODetails
+         SET path_display = ?, ImageUrl = ?, ModifiedDate = NOW()
+         WHERE VendorArticleName = ?`,
+        [image.path_display, image.ImageUrl, vendorArticleName]
+      )
+    : await query(
+        `UPDATE tblPODetails
+         SET path_display = ?, ImageUrl = ?, ModifiedDate = NOW()
+         WHERE POID = ?`,
+        [image.path_display, image.ImageUrl, poid]
+      );
+  const updatedRows = Number(updateResult.affectedRows || 0);
+
+  return {
+    ...image,
+    updatedRows,
+    message: vendorArticleName
+      ? `Dropbox image "${image.fileName}" saved to ${updatedRows} PO line${updatedRows === 1 ? '' : 's'} for vendor article "${vendorArticleName}".`
+      : `Dropbox image "${image.fileName}" saved for PO line ${poid}.`,
+  };
+}
+
+export async function syncMissingMasterImages() {
+  await ensurePODetailImageColumns();
+  const rows = await query(
+    `SELECT DISTINCT TRIM(VendorArticleName) AS VendorArticleName
+     FROM tblPODetails
+     WHERE NULLIF(TRIM(VendorArticleName), '') IS NOT NULL
+       AND (
+         NULLIF(TRIM(path_display), '') IS NULL
+         OR NULLIF(TRIM(ImageUrl), '') IS NULL
+         OR ImageUrl LIKE '%/cd/0/get/%'
+       )
+     ORDER BY VendorArticleName`
+  );
+
+  const articles = rows.map((row) => row.VendorArticleName);
+  const results = await mapWithConcurrency(articles, 3, async (vendorArticleName) => {
+    try {
+      const image = await findDropboxImage(vendorArticleName);
+      const updateResult = await query(
+        `UPDATE tblPODetails
+         SET path_display = ?, ImageUrl = ?, ModifiedDate = NOW()
+         WHERE VendorArticleName = ?`,
+        [image.path_display, image.ImageUrl, vendorArticleName]
+      );
+      return {
+        ok: true,
+        vendorArticleName,
+        updatedRows: Number(updateResult.affectedRows || 0),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        vendorArticleName,
+        error: error.message,
+      };
+    }
+  });
+
+  const synced = results.filter((result) => result.ok);
+  const failures = results.filter((result) => !result.ok);
+  return {
+    checkedArticles: articles.length,
+    syncedArticles: synced.length,
+    updatedRows: synced.reduce((total, result) => total + result.updatedRows, 0),
+    failures,
+    message: articles.length
+      ? `Image URL update completed: ${synced.length} vendor article${synced.length === 1 ? '' : 's'} synced, ${failures.length} not found.`
+      : 'All vendor article image URLs are already up to date.',
+  };
+}
+
 export async function deleteMasterPurchaseOrder(poBarcode) {
   const value = String(poBarcode || '').trim();
   if (!value) throw new Error('Please select a purchase order to delete.');
@@ -140,6 +252,27 @@ export async function deleteMasterPurchaseOrder(poBarcode) {
   });
 }
 
+async function mapWithConcurrency(values, concurrency, work) {
+  const results = new Array(values.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await work(values[index], index);
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(concurrency, values.length) },
+      () => worker()
+    )
+  );
+  return results;
+}
+
 function normalizeMasterValue(field, value) {
   if (field === 'MRP' || field === 'Rate' || field === 'LandingPrice') {
     const number = Number(value || 0);
@@ -153,6 +286,19 @@ function normalizeMasterValue(field, value) {
   }
   if (field === 'EstimatedDeliveryDate' || field === 'FactoryDispatchDate') {
     return value ? String(value).slice(0, 10) : null;
+  }
+  if (field === 'path_display') {
+    const text = String(value || '').trim();
+    if (text.length > 1024) throw new Error('Dropbox path must be 1,024 characters or fewer.');
+    return text;
+  }
+  if (field === 'ImageUrl') {
+    const text = String(value || '').trim();
+    if (text.length > 2048) throw new Error('Image URL must be 2,048 characters or fewer.');
+    if (text && !/^https?:\/\//i.test(text)) {
+      throw new Error('Image URL must begin with http:// or https://.');
+    }
+    return text;
   }
   return String(value || '').trim();
 }

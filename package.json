@@ -7,7 +7,9 @@
     "build": "node ./node_modules/next/dist/bin/next build",
     "start": "node ./node_modules/next/dist/bin/next start",
     "lint": "node ./node_modules/next/dist/bin/next lint",
-    "db:check": "node scripts/check-db.js"
+    "db:check": "node scripts/check-db.js",
+    "db:migrate:dropbox-images": "node scripts/migrate-dropbox-images.js",
+    "db:sync:dropbox-images": "node scripts/sync-dropbox-images.js"
   },
   "dependencies": {
     "@next/env": "latest",

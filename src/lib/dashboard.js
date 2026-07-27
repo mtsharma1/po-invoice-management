@@ -1,9 +1,9 @@
 import { query } from './db';
 
-function accessDashboardMonth(reference = new Date()) {
+function previousDashboardMonth(reference = new Date()) {
+  const previousMonthStart = new Date(reference.getFullYear(), reference.getMonth() - 1, 1);
   const currentMonthStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
-  const nextMonthStart = new Date(reference.getFullYear(), reference.getMonth() + 1, 1);
-  const daysInCurrentMonth = new Date(reference.getFullYear(), reference.getMonth() + 1, 0).getDate();
+  const daysInPreviousMonth = new Date(reference.getFullYear(), reference.getMonth(), 0).getDate();
   const sqlDate = (value) => [
     value.getFullYear(),
     String(value.getMonth() + 1).padStart(2, '0'),
@@ -11,16 +11,16 @@ function accessDashboardMonth(reference = new Date()) {
   ].join('-');
 
   return {
-    from: sqlDate(currentMonthStart),
-    to: sqlDate(nextMonthStart),
-    days: daysInCurrentMonth,
-    label: currentMonthStart.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+    from: sqlDate(previousMonthStart),
+    to: sqlDate(currentMonthStart),
+    days: daysInPreviousMonth,
+    label: previousMonthStart.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
   };
 }
 
 export async function getDashboardStats() {
-  const period = accessDashboardMonth();
-  const [pendingRows, dispatchRows] = await Promise.all([
+  const period = previousDashboardMonth();
+  const [pendingRows, dispatchRows, yesterdayRows] = await Promise.all([
     query(
       `SELECT Category, COALESCE(SUM(PendingQty), 0) AS PendingQty
        FROM (
@@ -48,6 +48,17 @@ export async function getDashboardStats() {
                      THEN 'SuitCase' ELSE 'BackPack' END`,
       [period.from, period.to]
     ),
+    query(
+      `SELECT
+         CASE WHEN COALESCE(d.VendorPrefix, '') = 'T_TR'
+              THEN 'SuitCase' ELSE 'BackPack' END AS Category,
+         COALESCE(SUM(d.DispatchQty), 0) AS DispatchQty
+       FROM vwDispatchDetails d
+       WHERE d.DispatchDate >= CURRENT_DATE - INTERVAL 1 DAY
+         AND d.DispatchDate < CURRENT_DATE
+       GROUP BY CASE WHEN COALESCE(d.VendorPrefix, '') = 'T_TR'
+                     THEN 'SuitCase' ELSE 'BackPack' END`
+    ),
   ]);
 
   const pendingByCategory = Object.fromEntries(
@@ -55,6 +66,9 @@ export async function getDashboardStats() {
   );
   const dispatchByCategory = Object.fromEntries(
     dispatchRows.map((row) => [row.Category, Number(row.DispatchQty || 0)])
+  );
+  const yesterdayByCategory = Object.fromEntries(
+    yesterdayRows.map((row) => [row.Category, Number(row.DispatchQty || 0)])
   );
 
   const categoryStats = (category) => {
@@ -64,9 +78,8 @@ export async function getDashboardStats() {
       pendingOrders,
       dispatchedLastMonth,
       dispatchAverageLastMonth: dispatchedLastMonth / period.days,
-      // The Access Backpack function currently evaluates its own empty return value,
-      // so it always displays zero. Preserve that behavior for an exact dashboard match.
-      daysOrderInHand: category === 'BackPack' ? 0 : Math.round(pendingOrders / 1000),
+      daysOrderInHand: Math.round(pendingOrders / 1000),
+      yesterdayDispatch: yesterdayByCategory[category] || 0,
     };
   };
 
