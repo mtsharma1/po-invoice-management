@@ -51,6 +51,41 @@ const detailColumns = [
   'FactoryDispatchDate',
 ];
 
+// These fields remain in the database schema for compatibility with older
+// imports, but the current PO workbook marks them red and explicitly excludes
+// them from import. Saving null/default values also prevents stale spreadsheet
+// values from leaking into new purchase orders.
+const ignoredWorkbookColumns = new Set([
+  'SKUId',
+  'SKUCode',
+  'VendorArticleNumber',
+  'CreditPeriod',
+  'MarginType',
+  'AgreedMargin',
+  'GrossMargin',
+  'FOBAmount',
+  'TaxBCD',
+  'TaxBCDAmount',
+  'BuyingTaxIGST',
+  'BuyingTaxIGSTAmount',
+  'TaxSWT',
+  'TaxSWTAmount',
+  'SellingTax',
+]);
+
+const ignoredNumericWorkbookColumns = new Set([
+  'AgreedMargin',
+  'GrossMargin',
+  'FOBAmount',
+  'TaxBCD',
+  'TaxBCDAmount',
+  'BuyingTaxIGST',
+  'BuyingTaxIGSTAmount',
+  'TaxSWT',
+  'TaxSWTAmount',
+  'SellingTax',
+]);
+
 const detailMap = {
   SKUId: ['SKU Id', 'SKU ID'],
   StyleId: ['Style Id', 'Style ID'],
@@ -79,7 +114,6 @@ const detailMap = {
   BuyingTaxIGSTAmount: ['Buying Tax IGST Amount'],
   TaxSWT: ['Tax SWT'],
   TaxSWTAmount: ['Tax SWT Amount'],
-  SellingTax: ['Selling Tax'],
   SellingTaxCGST: ['Selling Tax CGST'],
   SellingTaxIGST: ['Selling Tax IGST'],
   SellingTaxIGSTAmount: ['Selling Tax IGST Amount'],
@@ -87,6 +121,53 @@ const detailMap = {
   SellingTaxSGSTAmount: ['Selling Tax SGST Amount'],
   FactoryDispatchDate: ['Factory Dispatch Date'],
 };
+
+const requiredWorkbookDetailColumns = [
+  'StyleId',
+  'HSNCode',
+  'Brand',
+  'GTIN',
+  'VendorArticleName',
+  'Size',
+  'Colour',
+  'MRP',
+  'Quantity',
+  'ListPriceFOBTransportExcise',
+  'LandingPrice',
+  'EstimatedDeliveryDate',
+  'SellingTaxCGST',
+  'SellingTaxIGST',
+  'SellingTaxIGSTAmount',
+  'SellingTaxSGST',
+  'SellingTaxSGSTAmount',
+  'Category',
+];
+
+const requiredLineValues = [
+  'StyleId',
+  'HSNCode',
+  'GTIN',
+  'VendorArticleName',
+  'Size',
+  'Colour',
+  'MRP',
+  'Quantity',
+  'Category',
+];
+
+const allowedCategories = new Map([
+  ['suitcase', 'SuitCase'],
+  ['backpack', 'BackPack'],
+  ['smallhardcase', 'Small Hard Case'],
+]);
+
+export class PurchaseOrderValidationError extends Error {
+  constructor(message, issues = []) {
+    super(message);
+    this.name = 'PurchaseOrderValidationError';
+    this.issues = issues;
+  }
+}
 
 export async function getImportScreenData(sessionId) {
   await ensureWebImportTables();
@@ -172,7 +253,7 @@ export async function saveStagedPurchaseOrder(sessionId) {
 
     await run(
       `INSERT INTO tblPODetails (${detailColumns.join(', ')})
-       SELECT ${detailColumns.join(', ')}
+       SELECT ${detailColumns.map(detailDatabaseSelectExpression).join(', ')}
        FROM webTmpPODetails
        WHERE SessionId = ?
        ORDER BY WTID`,
@@ -210,11 +291,7 @@ export async function importPurchaseOrderWorkbook(fileBuffer) {
       headerColumns.map((column) => header[column] ?? null)
     );
 
-    await run(
-      `INSERT INTO tblPODetails (${detailColumns.join(', ')})
-       VALUES ?`,
-      [details.map((row) => detailColumns.map((column) => row[column] ?? null))]
-    );
+    await insertPODetailsWithRowDiagnostics(run, details);
 
     const dispatchSchedule = await assignFactoryDispatchDates(run);
 
@@ -392,23 +469,66 @@ export async function ensureWebImportTables(run = query) {
 }
 
 async function parsePurchaseOrderWorkbook(fileBuffer) {
-  if (!fileBuffer?.length) throw new Error('Please select a purchase order Excel file.');
+  if (!fileBuffer?.length) {
+    throw new PurchaseOrderValidationError('The workbook is empty.', [
+      importIssue({ field: 'File', reason: 'The workbook is empty.' }),
+    ]);
+  }
 
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(fileBuffer);
+  try {
+    await workbook.xlsx.load(fileBuffer);
+  } catch {
+    throw new PurchaseOrderValidationError('The file is not a valid Excel .xlsx workbook.', [
+      importIssue({ field: 'File format', reason: 'The file is not a valid Excel .xlsx workbook.' }),
+    ]);
+  }
   const worksheet = workbook.getWorksheet('Purchase Order') || workbook.worksheets[0];
-  if (!worksheet) throw new Error('Purchase Order worksheet was not found.');
+  if (!worksheet) {
+    throw new PurchaseOrderValidationError('Purchase Order worksheet was not found.', [
+      importIssue({ worksheet: 'Purchase Order', field: 'Worksheet', reason: 'Purchase Order worksheet was not found.' }),
+    ]);
+  }
 
   const header = readPOHeader(worksheet);
-  if (!header.POBarcode) throw new Error('PO Barcode not found.');
+  if (!header.POBarcode) {
+    throw new PurchaseOrderValidationError('PO Barcode not found.', [
+      importIssue({ worksheet: worksheet.name, field: 'PO Barcode', reason: 'PO Barcode is blank or its label is missing.' }),
+    ]);
+  }
 
   const headerRow = findHeaderRow(worksheet, 'SKU Code');
-  if (!headerRow) throw new Error('SKU header row not found.');
+  if (!headerRow) {
+    throw new PurchaseOrderValidationError('SKU header row not found.', [
+      importIssue({ worksheet: worksheet.name, field: 'SKU header', reason: 'The item header row could not be identified.' }),
+    ]);
+  }
 
   const columnMap = buildColumnMap(worksheet, headerRow);
-  const details = readDetailRows(worksheet, headerRow, columnMap, header.POBarcode);
-  if (!details.length) throw new Error('No SKU rows were found in the selected file.');
+  const missingHeaders = requiredWorkbookDetailColumns.filter((column) => !mappedColumnNumber(columnMap, column));
+  if (missingHeaders.length) {
+    const issues = missingHeaders.map((column) => importIssue({
+      worksheet: worksheet.name,
+      row: headerRow,
+      field: displayColumnName(column),
+      reason: `Required column "${displayColumnName(column)}" is missing from the item header row.`,
+    }));
+    throw new PurchaseOrderValidationError('The workbook format does not match the PO template.', issues);
+  }
+
+  const { details, issues } = readDetailRows(worksheet, headerRow, columnMap, header.POBarcode);
+  if (issues.length) {
+    throw new PurchaseOrderValidationError(
+      `${issues.length} item validation error${issues.length === 1 ? '' : 's'} found.`,
+      issues
+    );
+  }
+  if (!details.length) {
+    throw new PurchaseOrderValidationError('No SKU rows were found in the selected file.', [
+      importIssue({ worksheet: worksheet.name, row: headerRow + 1, field: 'Item rows', reason: 'No purchase-order item rows were found.' }),
+    ]);
+  }
 
   return { header, details };
 }
@@ -457,27 +577,75 @@ function buildColumnMap(worksheet, headerRow) {
 }
 
 function readDetailRows(worksheet, headerRow, columnMap, poBarcode) {
-  const skuColumn = columnMap[normaliseHeader('SKU Code')];
   const rows = [];
-  if (!skuColumn) return rows;
+  const issues = [];
 
   for (let row = headerRow + 1; row <= worksheet.rowCount; row += 1) {
-    if (!cellText(worksheet.getCell(row, skuColumn))) continue;
+    if (!hasMappedRowData(worksheet, row, columnMap)) continue;
     const detail = {};
+    detail.__excelRow = row;
     for (const column of detailColumns) {
       if (column === 'POBarcode') {
         detail[column] = poBarcode;
+      } else if (ignoredWorkbookColumns.has(column)) {
+        detail[column] = null;
       } else if (['EstimatedDeliveryDate', 'FactoryDispatchDate'].includes(column)) {
         detail[column] = toSqlDate(getMappedCell(worksheet, row, columnMap, column));
       } else if (numericColumn(column)) {
         detail[column] = toNumber(getMappedCell(worksheet, row, columnMap, column));
       } else {
-        detail[column] = getMappedCell(worksheet, row, columnMap, column);
+        const value = getMappedCell(worksheet, row, columnMap, column);
+        detail[column] = column === 'Category' ? canonicalCategory(value) : value;
       }
     }
+
+    for (const column of requiredLineValues) {
+      const rawValue = getMappedCell(worksheet, row, columnMap, column);
+      if (rawValue === null || rawValue === undefined || String(rawValue).trim() === '') {
+        issues.push(importIssue({
+          worksheet: worksheet.name,
+          row,
+          field: displayColumnName(column),
+          reason: `${displayColumnName(column)} is required.`,
+        }));
+      }
+    }
+
+    for (const column of requiredWorkbookDetailColumns.filter(numericColumn)) {
+      const rawValue = getMappedCell(worksheet, row, columnMap, column);
+      if (rawValue !== null && rawValue !== undefined && String(rawValue).trim() !== '' && !isNumericValue(rawValue)) {
+        issues.push(importIssue({
+          worksheet: worksheet.name,
+          row,
+          field: displayColumnName(column),
+          reason: `"${String(rawValue).trim()}" is not a valid number.`,
+        }));
+      }
+    }
+
+    const rawDeliveryDate = getMappedCell(worksheet, row, columnMap, 'EstimatedDeliveryDate');
+    if (rawDeliveryDate && !toSqlDate(rawDeliveryDate)) {
+      issues.push(importIssue({
+        worksheet: worksheet.name,
+        row,
+        field: displayColumnName('EstimatedDeliveryDate'),
+        reason: `"${String(rawDeliveryDate).trim()}" is not a valid date.`,
+      }));
+    }
+
+    const rawCategory = getMappedCell(worksheet, row, columnMap, 'Category');
+    if (rawCategory && !canonicalCategory(rawCategory)) {
+      issues.push(importIssue({
+        worksheet: worksheet.name,
+        row,
+        field: 'Category',
+        reason: `Category must be SuitCase, BackPack, or Small Hard Case; received "${String(rawCategory).trim()}".`,
+      }));
+    }
+
     rows.push(detail);
   }
-  return rows;
+  return { details: rows, issues };
 }
 
 function getMappedCell(worksheet, row, columnMap, column) {
@@ -487,6 +655,40 @@ function getMappedCell(worksheet, row, columnMap, column) {
     if (columnNumber) return cellValue(worksheet.getCell(row, columnNumber));
   }
   return '';
+}
+
+function mappedColumnNumber(columnMap, column) {
+  const headers = detailMap[column] || [column];
+  for (const header of headers) {
+    const columnNumber = columnMap[normaliseHeader(header)];
+    if (columnNumber) return columnNumber;
+  }
+  return 0;
+}
+
+function hasMappedRowData(worksheet, row, columnMap) {
+  return requiredWorkbookDetailColumns.some((column) => {
+    const columnNumber = mappedColumnNumber(columnMap, column);
+    return columnNumber && cellText(worksheet.getCell(row, columnNumber));
+  });
+}
+
+function canonicalCategory(value) {
+  const key = String(value || '').toLowerCase().replace(/[\s_-]+/g, '');
+  return allowedCategories.get(key) || '';
+}
+
+function isNumericValue(value) {
+  const normalized = String(value).replace(/,/g, '').trim();
+  return normalized !== '' && Number.isFinite(Number(normalized));
+}
+
+function displayColumnName(column) {
+  return detailMap[column]?.[0] || String(column).replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+function importIssue({ worksheet = '', row = '', field = '', reason = '' }) {
+  return { worksheet, row, field, reason };
 }
 
 function numericColumn(column) {
@@ -511,6 +713,40 @@ function numericColumn(column) {
     'SellingTaxSGST',
     'SellingTaxSGSTAmount',
   ].includes(column);
+}
+
+function detailDatabaseSelectExpression(column) {
+  if (!ignoredWorkbookColumns.has(column)) return column;
+  const fallback = ignoredNumericWorkbookColumns.has(column) ? '0' : "''";
+  return `COALESCE(${column}, ${fallback}) AS ${column}`;
+}
+
+function detailDatabaseValue(column, value) {
+  if (!ignoredWorkbookColumns.has(column)) return value ?? null;
+  return ignoredNumericWorkbookColumns.has(column) ? Number(value || 0) : String(value || '');
+}
+
+async function insertPODetailsWithRowDiagnostics(run, details) {
+  const sql = `INSERT INTO tblPODetails (${detailColumns.join(', ')}) VALUES ?`;
+  const values = details.map((row) => detailColumns.map((column) => detailDatabaseValue(column, row[column])));
+  try {
+    await run(sql, [values]);
+    return;
+  } catch {
+    for (let index = 0; index < details.length; index += 1) {
+      try {
+        await run(sql, [[values[index]]]);
+      } catch (rowError) {
+        throw new PurchaseOrderValidationError('A purchase-order line was rejected by the database.', [
+          importIssue({
+            row: details[index].__excelRow || index + 1,
+            field: 'Database validation',
+            reason: rowError.message || 'The database rejected this item row.',
+          }),
+        ]);
+      }
+    }
+  }
 }
 
 function normaliseHeader(value) {

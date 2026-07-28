@@ -226,6 +226,19 @@ export async function getDropboxAccessToken() {
 }
 
 export async function findDropboxImage(productName) {
+  const files = await findDropboxImageFiles(productName, 1);
+  const file = files[0];
+  const accessToken = await getDropboxAccessToken();
+  const ImageUrl = await getDropboxSharedImageUrl(accessToken, file.path_display);
+
+  return {
+    path_display: file.path_display,
+    ImageUrl,
+    fileName: file.name || '',
+  };
+}
+
+export async function findDropboxImageFiles(productName, maximum = 3) {
   const searchText = String(productName || '').trim();
   if (!searchText) throw new Error('Enter a product name to search in Dropbox.');
 
@@ -259,16 +272,35 @@ export async function findDropboxImage(productName) {
     throw new Error(`No Dropbox image was found for "${searchText}".`);
   }
 
-  // Dropbox returns matches in relevance order. When an article has multiple
-  // matching image paths, use the first file exactly as requested.
-  const file = files[0];
-  const ImageUrl = await getDropboxSharedImageUrl(accessToken, file.path_display);
+  return files.slice(0, Math.max(1, Math.min(3, Number(maximum) || 3)));
+}
 
-  return {
-    path_display: file.path_display,
-    ImageUrl,
-    fileName: file.name || '',
-  };
+export async function downloadDropboxImage(path) {
+  const accessToken = await getDropboxAccessToken();
+  const response = await fetch('https://content.dropboxapi.com/2/files/download', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Dropbox-API-Arg': JSON.stringify({ path }),
+    },
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    let result = {};
+    try {
+      result = JSON.parse(await response.text());
+    } catch {
+      // Dropbox may return a non-JSON gateway error.
+    }
+    throw new Error(dropboxError(result, `Dropbox image download failed for "${path}".`));
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!buffer.length) throw new Error(`Dropbox returned an empty image for "${path}".`);
+  if (buffer.length > 5 * 1024 * 1024) {
+    throw new Error(`Dropbox image "${path}" is larger than 5 MB.`);
+  }
+  return buffer;
 }
 
 async function getDropboxSharedImageUrl(accessToken, path) {

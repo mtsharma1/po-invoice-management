@@ -55,6 +55,8 @@ export default function MasterWorkbench({ data, selectedPO }) {
   const [imageViewer, setImageViewer] = useState(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imageSyncing, setImageSyncing] = useState(false);
+  const [databaseImageFile, setDatabaseImageFile] = useState(null);
+  const [databaseImageSaving, setDatabaseImageSaving] = useState(false);
   const [isPending, startTransition] = useTransition();
   const selectedSummary = data.purchaseOrders.find((row) => row.POBarcode === selectedPO);
 
@@ -66,6 +68,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
 
   function editRow(row) {
     setMessage('');
+    setDatabaseImageFile(null);
     setEditor({
       ...row,
       imageSearchQuery: row.VendorArticleName || row.VendorArticleNumber || row.StyleId || row.SKUCode || '',
@@ -120,6 +123,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
         ...current,
         path_display: result.path_display,
         ImageUrl: result.ImageUrl,
+        ImageCount: result.ImageCount,
       }));
       setMessage(result.message);
       router.refresh();
@@ -134,16 +138,20 @@ export default function MasterWorkbench({ data, selectedPO }) {
     if (imageSyncing) return;
     try {
       setImageSyncing(true);
-      setMessage('Checking missing and temporary image URLs in Dropbox…');
-      const response = await fetch('/api/master/images/sync', {
+      setMessage('Fetching up to three Dropbox images for every vendor article…');
+      const response = await fetch('/api/master/images/import-dropbox', {
         method: 'POST',
       });
       const result = await response.json();
       if (!response.ok || !result.ok) {
         throw new Error(result.error || 'Image URLs could not be updated.');
       }
-      const failureText = result.failures?.length
-        ? ` Not found: ${result.failures.map((failure) => failure.vendorArticleName).join(', ')}.`
+      const failedNames = (result.failures || [])
+        .slice(0, 10)
+        .map((failure) => failure.vendorArticleName);
+      const remainingFailures = Math.max(0, Number(result.failures?.length || 0) - failedNames.length);
+      const failureText = failedNames.length
+        ? ` Not found: ${failedNames.join(', ')}${remainingFailures ? ` and ${remainingFailures} more` : ''}.`
         : '';
       setMessage(`${result.message}${failureText}`);
       setEditor(null);
@@ -152,6 +160,38 @@ export default function MasterWorkbench({ data, selectedPO }) {
       setMessage(error.message);
     } finally {
       setImageSyncing(false);
+    }
+  }
+
+  async function saveDatabaseImage() {
+    if (!editor || !databaseImageFile || databaseImageSaving) return;
+    try {
+      setDatabaseImageSaving(true);
+      setMessage(`Saving ${databaseImageFile.name} in the database…`);
+      const formData = new FormData();
+      formData.set('POID', String(editor.POID));
+      formData.set('image', databaseImageFile);
+      const response = await fetch('/api/master/images/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || 'Database image could not be saved.');
+      }
+      setEditor((current) => ({
+        ...current,
+        path_display: '',
+        ImageUrl: result.ImageUrl,
+        ImageCount: 1,
+      }));
+      setDatabaseImageFile(null);
+      setMessage(result.message);
+      router.refresh();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setDatabaseImageSaving(false);
     }
   }
 
@@ -220,7 +260,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
           onClick={syncMissingImages}
           disabled={imageSyncing || isPending || imageLoading}
         >
-          <ImageSyncIcon /> {imageSyncing ? 'Updating images…' : 'Update missing image URLs'}
+          <ImageSyncIcon /> {imageSyncing ? 'Importing images…' : 'Update product images'}
         </button>
         <div className="master-selection-summary">
           {selectedPO ? (
@@ -263,8 +303,8 @@ export default function MasterWorkbench({ data, selectedPO }) {
             <div className="master-image-editor-heading">
               <div>
                 <p>Product image</p>
-                <h3>Dropbox image details</h3>
-                <span>Search Dropbox first, then review or replace the stored values.</span>
+                <h3>Image details</h3>
+                <span>Upload an image into the database or fetch one from Dropbox.</span>
               </div>
               {editor.ImageUrl ? (
                 <button
@@ -273,12 +313,33 @@ export default function MasterWorkbench({ data, selectedPO }) {
                   onClick={() => setImageViewer({
                     url: editor.ImageUrl,
                     name: editor.VendorArticleName || `PO line ${editor.POID}`,
+                    count: Number(editor.ImageCount || 1),
+                    index: 1,
                   })}
                 >
                   View image
                 </button>
               ) : null}
             </div>
+            <div className="master-database-image-upload">
+              <label>
+                <span>Select image file from this computer</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(event) => setDatabaseImageFile(event.target.files?.[0] || null)}
+                />
+                <small>JPG, PNG, WebP or GIF · maximum 5 MB · saved inside MySQL, not Dropbox</small>
+              </label>
+              <button
+                type="button"
+                onClick={saveDatabaseImage}
+                disabled={!databaseImageFile || databaseImageSaving || imageLoading || isPending}
+              >
+                {databaseImageSaving ? 'Saving image…' : 'Save image in database'}
+              </button>
+            </div>
+            <div className="master-image-source-divider"><span>Or use Dropbox</span></div>
             <div className="master-image-search">
               <label>
                 <span>Dropbox product-name search</span>
@@ -289,7 +350,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
                 />
               </label>
               <button type="button" onClick={fetchDropboxImage} disabled={imageLoading || isPending}>
-                {imageLoading ? 'Fetching…' : editor.ImageUrl ? 'Refresh from Dropbox' : 'Fetch from Dropbox'}
+                {imageLoading ? 'Fetching…' : 'Fetch first 3 from Dropbox'}
               </button>
             </div>
             <div className="master-image-fields">
@@ -341,6 +402,8 @@ export default function MasterWorkbench({ data, selectedPO }) {
                           onClick={() => setImageViewer({
                             url: row.ImageUrl,
                             name: row.VendorArticleName || `PO line ${row.POID}`,
+                            count: Number(row.ImageCount || 1),
+                            index: 1,
                           })}
                         >
                           {row.ImageUrl}
@@ -372,10 +435,33 @@ export default function MasterWorkbench({ data, selectedPO }) {
               </button>
             </header>
             <div className="master-image-canvas">
-              <img src={imageViewer.url} alt={imageViewer.name} />
+              <img src={currentViewerUrl(imageViewer)} alt={`${imageViewer.name} ${imageViewer.index}`} />
             </div>
             <footer>
-              <a href={imageViewer.url} target="_blank" rel="noreferrer">Open image in new tab</a>
+              {imageViewer.count > 1 ? (
+                <div className="master-image-navigation">
+                  <button
+                    type="button"
+                    onClick={() => setImageViewer((current) => ({
+                      ...current,
+                      index: current.index <= 1 ? current.count : current.index - 1,
+                    }))}
+                  >
+                    Previous
+                  </button>
+                  <span>{imageViewer.index} of {imageViewer.count}</span>
+                  <button
+                    type="button"
+                    onClick={() => setImageViewer((current) => ({
+                      ...current,
+                      index: current.index >= current.count ? 1 : current.index + 1,
+                    }))}
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : null}
+              <a href={currentViewerUrl(imageViewer)} target="_blank" rel="noreferrer">Open image in new tab</a>
               <button type="button" onClick={() => setImageViewer(null)}>Close</button>
             </footer>
           </section>
@@ -417,6 +503,13 @@ function displayValue(field, value) {
 
 function dateInputValue(value) {
   return value ? String(value).slice(0, 10) : '';
+}
+
+function currentViewerUrl(viewer) {
+  if (!viewer?.url) return '';
+  if (!viewer.url.startsWith('/api/master/images/')) return viewer.url;
+  const separator = viewer.url.includes('?') ? '&' : '?';
+  return `${viewer.url}${separator}index=${viewer.index || 1}`;
 }
 
 function TrashIcon() {

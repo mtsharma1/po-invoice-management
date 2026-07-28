@@ -91,6 +91,22 @@ CREATE TABLE IF NOT EXISTS webFileTemplates (
   PRIMARY KEY (TemplateKey)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS webPOImportErrorLogs (
+  ErrorLogID BIGINT NOT NULL AUTO_INCREMENT,
+  BatchID VARCHAR(64) NOT NULL,
+  FileName VARCHAR(255) NOT NULL,
+  POBarcode VARCHAR(50) NULL,
+  WorksheetName VARCHAR(255) NULL,
+  ExcelRow INT NULL,
+  FieldName VARCHAR(255) NULL,
+  FailureReason TEXT NOT NULL,
+  ErrorDateTime DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (ErrorLogID),
+  INDEX IX_webPOImportErrorLogs_BatchID (BatchID),
+  INDEX IX_webPOImportErrorLogs_FileName (FileName),
+  INDEX IX_webPOImportErrorLogs_ErrorDateTime (ErrorDateTime)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS tblPODetails (
   POID INT NOT NULL AUTO_INCREMENT,
   POBarcode VARCHAR(50) NULL,
@@ -134,6 +150,9 @@ CREATE TABLE IF NOT EXISTS tblPODetails (
   AvailableStock INT NULL DEFAULT 0,
   path_display VARCHAR(1024) NULL,
   ImageUrl VARCHAR(2048) NULL,
+  ImageData LONGBLOB NULL,
+  ImageData2 LONGBLOB NULL,
+  ImageData3 LONGBLOB NULL,
   PRIMARY KEY (POID),
   INDEX IX_POBarcode (POBarcode),
   INDEX IX_SKUCode (SKUCode),

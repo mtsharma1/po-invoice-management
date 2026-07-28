@@ -49,7 +49,7 @@ async function getAccessToken(refreshToken) {
   return result.access_token;
 }
 
-async function firstDropboxImage(accessToken, vendorArticleName) {
+async function firstDropboxImages(accessToken, vendorArticleName) {
   const response = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
     method: 'POST',
     headers: {
@@ -70,44 +70,24 @@ async function firstDropboxImage(accessToken, vendorArticleName) {
   const files = (result.matches || [])
     .map((match) => match?.metadata?.metadata)
     .filter((metadata) => metadata?.['.tag'] === 'file' && metadata.path_display);
-  return files[0] || null;
+  return files.slice(0, 3);
 }
 
-async function listSharedUrl(accessToken, path) {
-  const response = await fetch('https://api.dropboxapi.com/2/sharing/list_shared_links', {
+async function downloadDropboxImage(accessToken, path) {
+  const response = await fetch('https://content.dropboxapi.com/2/files/download', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
+      'Dropbox-API-Arg': JSON.stringify({ path }),
     },
-    body: JSON.stringify({ path, direct_only: true }),
   });
-  const result = await responseJson(response, 'Dropbox shared links could not be checked.');
-  return result.links?.[0]?.url || '';
-}
-
-async function reusableImageUrl(accessToken, path) {
-  let sharedUrl = await listSharedUrl(accessToken, path);
-  if (!sharedUrl) {
-    const response = await fetch(
-      'https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ path }),
-      }
-    );
-    const result = await responseJson(response, 'Dropbox shared link could not be created.');
-    sharedUrl = result.url;
+  if (!response.ok) {
+    throw new Error(`Dropbox image download failed for "${path}".`);
   }
-
-  const url = new URL(sharedUrl);
-  url.searchParams.delete('dl');
-  url.searchParams.set('raw', '1');
-  return url.toString();
+  const image = Buffer.from(await response.arrayBuffer());
+  if (!image.length) throw new Error(`Dropbox returned an empty image for "${path}".`);
+  if (image.length > 5 * 1024 * 1024) throw new Error(`Dropbox image "${path}" is larger than 5 MB.`);
+  return image;
 }
 
 async function main() {
@@ -153,24 +133,48 @@ async function main() {
     console.log(`Syncing ${articles.length} distinct vendor articles...`);
 
     let synced = 0;
+    let savedImages = 0;
     let updatedRows = 0;
     const failures = [];
 
     for (let index = 0; index < articles.length; index += 1) {
       const article = String(articles[index].VendorArticleName).trim();
       try {
-        const file = await firstDropboxImage(accessToken, article);
-        if (!file) throw new Error('No matching Dropbox image found.');
-        const ImageUrl = await reusableImageUrl(accessToken, file.path_display);
+        const files = await firstDropboxImages(accessToken, article);
+        if (!files.length) throw new Error('No matching Dropbox image found.');
+        const images = await Promise.all(
+          files.map((file) => downloadDropboxImage(accessToken, file.path_display))
+        );
+        const [ownerRows] = await connection.query(
+          `SELECT POID
+           FROM tblPODetails
+           WHERE VendorArticleName = ?
+           ORDER BY CASE
+             WHEN ImageData IS NOT NULL AND OCTET_LENGTH(ImageData) > 0 THEN 0
+             ELSE 1
+           END, POID
+           LIMIT 1`,
+          [article]
+        );
+        const ownerPoid = Number(ownerRows[0].POID);
+        await connection.query(
+          `UPDATE tblPODetails
+           SET ImageData = ?, ImageData2 = ?, ImageData3 = ?, ModifiedDate = NOW()
+           WHERE POID = ?`,
+          [images[0] || null, images[1] || null, images[2] || null, ownerPoid]
+        );
         const [result] = await connection.query(
           `UPDATE tblPODetails
-           SET path_display = ?, ImageUrl = ?, ModifiedDate = NOW()
+           SET path_display = ?,
+               ImageUrl = CONCAT('/api/master/images/', POID),
+               ModifiedDate = NOW()
            WHERE VendorArticleName = ?`,
-          [file.path_display, ImageUrl, article]
+          [files[0].path_display, article]
         );
         synced += 1;
+        savedImages += images.length;
         updatedRows += Number(result.affectedRows || 0);
-        console.log(`[${index + 1}/${articles.length}] ${article}: ${file.path_display}`);
+        console.log(`[${index + 1}/${articles.length}] ${article}: ${images.length} image(s) saved`);
       } catch (error) {
         failures.push({ article, error: error.message });
         console.error(`[${index + 1}/${articles.length}] ${article}: ${error.message}`);
@@ -178,7 +182,7 @@ async function main() {
     }
 
     console.log(
-      `Dropbox image sync complete: ${synced} articles, ${updatedRows} rows updated, ${failures.length} failures.`
+      `Dropbox image sync complete: ${synced} articles, ${savedImages} images saved, ${updatedRows} rows updated, ${failures.length} failures.`
     );
     if (failures.length) {
       console.log('Articles without saved links:');

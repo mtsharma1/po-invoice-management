@@ -22,7 +22,7 @@ async function main() {
        FROM INFORMATION_SCHEMA.COLUMNS
        WHERE TABLE_SCHEMA = DATABASE()
          AND TABLE_NAME = 'tblPODetails'
-         AND COLUMN_NAME IN ('path_display', 'ImageUrl')`
+         AND COLUMN_NAME IN ('path_display', 'ImageUrl', 'ImageData', 'ImageData2', 'ImageData3')`
     );
     const columns = new Set(rows.map((row) => String(row.columnName).toLowerCase()));
 
@@ -40,13 +40,34 @@ async function main() {
       );
       console.log('Added tblPODetails.ImageUrl');
     }
+    if (!columns.has('imagedata')) {
+      await connection.query(
+        `ALTER TABLE tblPODetails
+         ADD COLUMN ImageData LONGBLOB NULL AFTER ImageUrl`
+      );
+      console.log('Added tblPODetails.ImageData');
+    }
+    if (!columns.has('imagedata2')) {
+      await connection.query(
+        `ALTER TABLE tblPODetails
+         ADD COLUMN ImageData2 LONGBLOB NULL AFTER ImageData`
+      );
+      console.log('Added tblPODetails.ImageData2');
+    }
+    if (!columns.has('imagedata3')) {
+      await connection.query(
+        `ALTER TABLE tblPODetails
+         ADD COLUMN ImageData3 LONGBLOB NULL AFTER ImageData2`
+      );
+      console.log('Added tblPODetails.ImageData3');
+    }
 
     const [verified] = await connection.query(
       `SELECT COLUMN_NAME AS columnName, COLUMN_TYPE AS columnType
        FROM INFORMATION_SCHEMA.COLUMNS
        WHERE TABLE_SCHEMA = DATABASE()
          AND TABLE_NAME = 'tblPODetails'
-         AND COLUMN_NAME IN ('path_display', 'ImageUrl')
+         AND COLUMN_NAME IN ('path_display', 'ImageUrl', 'ImageData', 'ImageData2', 'ImageData3')
        ORDER BY ORDINAL_POSITION`
     );
     for (const column of verified) {

@@ -7,28 +7,27 @@ import { safeData } from '@/lib/safeData';
 
 export const dynamic = 'force-dynamic';
 
-const emptyCategory = {
-  pendingOrders: 0,
-  dispatchedLastMonth: 0,
-  dispatchAverageLastMonth: 0,
-  daysOrderInHand: 0,
-  yesterdayDispatch: 0,
-};
-
 export default async function DashboardPage() {
   const { data, error } = await safeData(getDashboardStats, {
     periodLabel: '',
-    suitcase: emptyCategory,
-    backpack: emptyCategory,
+    categories: [],
   });
+  const accents = ['blue', 'green', 'amber', 'violet'];
 
   return (
     <AppShell>
       <PageHeader eyebrow="OPERATIONS" title="DASHBOARD" />
       <DataError error={error} />
       <section className="operations-dashboard">
-        <DashboardCategory title="SuitCase" data={data.suitcase} period={data.periodLabel} accent="blue" />
-        <DashboardCategory title="BackPack" data={data.backpack} period={data.periodLabel} accent="green" />
+        {data.categories.map((category, index) => (
+          <DashboardCategory
+            key={category.categoryName}
+            title={category.categoryName}
+            data={category}
+            period={data.periodLabel}
+            accent={accents[index % accents.length]}
+          />
+        ))}
       </section>
     </AppShell>
   );

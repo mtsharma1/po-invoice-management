@@ -58,7 +58,7 @@ async function applyPODetailImageSchema() {
      FROM INFORMATION_SCHEMA.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE()
        AND TABLE_NAME = 'tblPODetails'
-       AND COLUMN_NAME IN ('path_display', 'ImageUrl')`
+       AND COLUMN_NAME IN ('path_display', 'ImageUrl', 'ImageData', 'ImageData2', 'ImageData3')`
   );
   const columns = new Set(rows.map((row) => String(row.columnName).toLowerCase()));
 
@@ -72,6 +72,24 @@ async function applyPODetailImageSchema() {
     await query(
       `ALTER TABLE tblPODetails
        ADD COLUMN ImageUrl VARCHAR(2048) NULL AFTER path_display`
+    );
+  }
+  if (!columns.has('imagedata')) {
+    await query(
+      `ALTER TABLE tblPODetails
+       ADD COLUMN ImageData LONGBLOB NULL AFTER ImageUrl`
+    );
+  }
+  if (!columns.has('imagedata2')) {
+    await query(
+      `ALTER TABLE tblPODetails
+       ADD COLUMN ImageData2 LONGBLOB NULL AFTER ImageData`
+    );
+  }
+  if (!columns.has('imagedata3')) {
+    await query(
+      `ALTER TABLE tblPODetails
+       ADD COLUMN ImageData3 LONGBLOB NULL AFTER ImageData2`
     );
   }
 }
