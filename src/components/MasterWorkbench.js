@@ -104,7 +104,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
     if (imageSyncing) return;
     try {
       setImageSyncing(true);
-      setMessage('Fetching up to three Dropbox images for every vendor article…');
+      setMessage('Indexing Dropbox and updating only missing product images…');
       const response = await fetch('/api/master/images/import-dropbox', {
         method: 'POST',
       });

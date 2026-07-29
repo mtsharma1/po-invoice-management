@@ -303,6 +303,59 @@ export async function downloadDropboxImage(path) {
   return buffer;
 }
 
+export async function listDropboxImageFiles() {
+  const accessToken = await getDropboxAccessToken();
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+  };
+  let response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      path: '',
+      recursive: true,
+      include_deleted: false,
+      include_non_downloadable_files: false,
+      limit: 2000,
+    }),
+    cache: 'no-store',
+  });
+  let result = await response.json();
+  if (!response.ok) {
+    throw new Error(dropboxError(result, 'Dropbox image index could not be loaded.'));
+  }
+
+  const files = [];
+  appendImageEntries(files, result.entries);
+  while (result.has_more) {
+    response = await fetch('https://api.dropboxapi.com/2/files/list_folder/continue', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ cursor: result.cursor }),
+      cache: 'no-store',
+    });
+    result = await response.json();
+    if (!response.ok) {
+      throw new Error(dropboxError(result, 'Dropbox image index could not be continued.'));
+    }
+    appendImageEntries(files, result.entries);
+  }
+  return files;
+}
+
+function appendImageEntries(target, entries) {
+  for (const entry of entries || []) {
+    if (
+      entry?.['.tag'] === 'file' &&
+      entry.path_display &&
+      /\.(jpe?g|png|webp|gif)$/i.test(entry.name || '')
+    ) {
+      target.push(entry);
+    }
+  }
+}
+
 async function getDropboxSharedImageUrl(accessToken, path) {
   const headers = {
     Authorization: `Bearer ${accessToken}`,

@@ -3,6 +3,7 @@ import {
   downloadDropboxImage,
   findDropboxImage,
   findDropboxImageFiles,
+  listDropboxImageFiles,
 } from './dropbox';
 import { ensurePODetailImageColumns, ensurePOImportDateColumn } from './poSchema';
 
@@ -193,21 +194,59 @@ export async function fetchAndSaveMasterLineImage(payload) {
 
 export async function syncAllMasterDatabaseImagesFromDropbox() {
   await ensurePODetailImageColumns();
+  const repairedResult = await query(
+    `UPDATE tblPODetails target
+     INNER JOIN (
+       SELECT VendorArticleName
+       FROM tblPODetails
+       WHERE NULLIF(TRIM(VendorArticleName), '') IS NOT NULL
+       GROUP BY VendorArticleName
+       HAVING MAX(
+         CASE WHEN ImageData IS NOT NULL AND OCTET_LENGTH(ImageData) > 0
+              THEN 1 ELSE 0 END
+       ) = 1
+     ) available ON available.VendorArticleName = target.VendorArticleName
+     SET target.ImageUrl = CONCAT('/api/master/images/', target.POID),
+         target.ModifiedDate = NOW()
+     WHERE NULLIF(TRIM(target.ImageUrl), '') IS NULL
+        OR target.ImageUrl LIKE '%/cd/0/get/%'`
+  );
+
   const rows = await query(
     `SELECT MIN(POID) AS POID, TRIM(VendorArticleName) AS VendorArticleName
      FROM tblPODetails
      WHERE NULLIF(TRIM(VendorArticleName), '') IS NOT NULL
      GROUP BY VendorArticleName
+     HAVING MAX(
+       CASE WHEN ImageData IS NOT NULL AND OCTET_LENGTH(ImageData) > 0
+            THEN 1 ELSE 0 END
+     ) = 0
      ORDER BY VendorArticleName`
   );
+  const dropboxFiles = rows.length ? await listDropboxImageFiles() : [];
 
-  const results = await mapWithConcurrency(rows, 2, async (row) => {
+  const results = await mapWithConcurrency(rows, 6, async (row) => {
     try {
-      const result = await fetchAndSaveMasterLineImage({
-        POID: row.POID,
-        productName: row.VendorArticleName,
+      const articleKey = normalizedDropboxMatchText(row.VendorArticleName);
+      const files = dropboxFiles
+        .filter((file) => normalizedDropboxMatchText(file.path_display).includes(articleKey))
+        .slice(0, 3);
+      if (!files.length) throw new Error('No matching Dropbox image found.');
+      const imageBuffers = await Promise.all(
+        files.map((file) => downloadDropboxImage(file.path_display))
+      );
+      const saved = await saveMasterArticleImageBuffers({
+        poid: Number(row.POID),
+        vendorArticleName: row.VendorArticleName,
+        files,
+        imageBuffers,
       });
-      return { ok: true, vendorArticleName: row.VendorArticleName, ...result };
+      return {
+        ok: true,
+        vendorArticleName: row.VendorArticleName,
+        ImageCount: files.length,
+        updatedRows: saved.updatedRows,
+      };
     } catch (error) {
       return {
         ok: false,
@@ -223,9 +262,14 @@ export async function syncAllMasterDatabaseImagesFromDropbox() {
     checkedArticles: rows.length,
     syncedArticles: synced.length,
     savedImages: synced.reduce((total, result) => total + Number(result.ImageCount || 0), 0),
+    repairedRows: Number(repairedResult.affectedRows || 0),
     failures,
     message: `Product image update completed: ${synced.length} vendor article${synced.length === 1 ? '' : 's'} synced with ${synced.reduce((total, result) => total + Number(result.ImageCount || 0), 0)} database images, ${failures.length} not found.`,
   };
+}
+
+function normalizedDropboxMatchText(value) {
+  return String(value || '').trim().toLocaleLowerCase('en');
 }
 
 async function saveMasterArticleImageBuffers({
