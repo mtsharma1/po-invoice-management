@@ -20,11 +20,19 @@ function previousDashboardMonth(reference = new Date()) {
 
 const categoryExpression = `
   CASE
+    WHEN LOWER(REPLACE(REPLACE(REPLACE(TRIM(COALESCE(p.Category, '')), ' ', ''), '-', ''), '_', '')) = 'suitcase'
+      THEN 'SuitCase'
+    WHEN LOWER(REPLACE(REPLACE(REPLACE(TRIM(COALESCE(p.Category, '')), ' ', ''), '-', ''), '_', '')) = 'backpack'
+      THEN 'BackPack'
+    WHEN LOWER(REPLACE(REPLACE(REPLACE(TRIM(COALESCE(p.Category, '')), ' ', ''), '-', ''), '_', '')) = 'smallhardcase'
+      THEN 'Small Hard Case'
     WHEN NULLIF(TRIM(p.Category), '') IS NOT NULL THEN TRIM(p.Category)
     WHEN LEFT(COALESCE(p.VendorArticleName, ''), 4) = 'T_TR' THEN 'SuitCase'
     ELSE 'BackPack'
   END
 `;
+
+const standardCategories = ['SuitCase', 'BackPack', 'Small Hard Case'];
 
 export async function getDashboardStats() {
   const period = previousDashboardMonth();
@@ -70,11 +78,17 @@ export async function getDashboardStats() {
   const pendingByCategory = rowsToQuantityMap(pendingRows, 'PendingQty');
   const dispatchByCategory = rowsToQuantityMap(dispatchRows, 'DispatchQty');
   const yesterdayByCategory = rowsToQuantityMap(yesterdayRows, 'DispatchQty');
-  const categoryNames = Array.from(new Set([
+  const discoveredCategories = new Set([
     ...Object.keys(pendingByCategory),
     ...Object.keys(dispatchByCategory),
     ...Object.keys(yesterdayByCategory),
-  ])).sort((left, right) => left.localeCompare(right, 'en-IN', { sensitivity: 'base' }));
+  ]);
+  const categoryNames = [
+    ...standardCategories,
+    ...Array.from(discoveredCategories)
+      .filter((category) => !standardCategories.includes(category))
+      .sort((left, right) => left.localeCompare(right, 'en-IN', { sensitivity: 'base' })),
+  ];
 
   const categories = categoryNames.map((categoryName) => {
     const pendingOrders = pendingByCategory[categoryName] || 0;

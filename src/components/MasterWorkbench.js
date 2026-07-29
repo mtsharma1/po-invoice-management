@@ -53,7 +53,6 @@ export default function MasterWorkbench({ data, selectedPO }) {
   const [editor, setEditor] = useState(null);
   const [message, setMessage] = useState('');
   const [imageViewer, setImageViewer] = useState(null);
-  const [imageLoading, setImageLoading] = useState(false);
   const [imageSyncing, setImageSyncing] = useState(false);
   const [databaseImageFile, setDatabaseImageFile] = useState(null);
   const [databaseImageSaving, setDatabaseImageSaving] = useState(false);
@@ -71,7 +70,6 @@ export default function MasterWorkbench({ data, selectedPO }) {
     setDatabaseImageFile(null);
     setEditor({
       ...row,
-      imageSearchQuery: row.VendorArticleName || row.VendorArticleNumber || row.StyleId || row.SKUCode || '',
       EstimatedDeliveryDate: dateInputValue(row.EstimatedDeliveryDate),
       FactoryDispatchDate: dateInputValue(row.FactoryDispatchDate),
     });
@@ -100,38 +98,6 @@ export default function MasterWorkbench({ data, selectedPO }) {
         setMessage(error.message);
       }
     });
-  }
-
-  async function fetchDropboxImage() {
-    if (!editor || imageLoading) return;
-    try {
-      setImageLoading(true);
-      setMessage(`Searching Dropbox for "${editor.imageSearchQuery}"…`);
-      const response = await fetch('/api/master/line/dropbox-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          POID: editor.POID,
-          productName: editor.imageSearchQuery,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.ok) {
-        throw new Error(result.error || 'Dropbox image could not be fetched.');
-      }
-      setEditor((current) => ({
-        ...current,
-        path_display: result.path_display,
-        ImageUrl: result.ImageUrl,
-        ImageCount: result.ImageCount,
-      }));
-      setMessage(result.message);
-      router.refresh();
-    } catch (error) {
-      setMessage(error.message);
-    } finally {
-      setImageLoading(false);
-    }
   }
 
   async function syncMissingImages() {
@@ -258,7 +224,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
           className="master-image-sync"
           type="button"
           onClick={syncMissingImages}
-          disabled={imageSyncing || isPending || imageLoading}
+          disabled={imageSyncing || isPending}
         >
           <ImageSyncIcon /> {imageSyncing ? 'Importing images…' : 'Update product images'}
         </button>
@@ -334,42 +300,10 @@ export default function MasterWorkbench({ data, selectedPO }) {
               <button
                 type="button"
                 onClick={saveDatabaseImage}
-                disabled={!databaseImageFile || databaseImageSaving || imageLoading || isPending}
+                disabled={!databaseImageFile || databaseImageSaving || isPending}
               >
                 {databaseImageSaving ? 'Saving image…' : 'Save image in database'}
               </button>
-            </div>
-            <div className="master-image-source-divider"><span>Or use Dropbox</span></div>
-            <div className="master-image-search">
-              <label>
-                <span>Dropbox product-name search</span>
-                <input
-                  value={editor.imageSearchQuery || ''}
-                  onChange={(event) => updateEditor('imageSearchQuery', event.target.value)}
-                  placeholder="Vendor article name"
-                />
-              </label>
-              <button type="button" onClick={fetchDropboxImage} disabled={imageLoading || isPending}>
-                {imageLoading ? 'Fetching…' : 'Fetch first 3 from Dropbox'}
-              </button>
-            </div>
-            <div className="master-image-fields">
-              <label>
-                <span>Dropbox path_display</span>
-                <input
-                  value={editor.path_display || ''}
-                  onChange={(event) => updateEditor('path_display', event.target.value)}
-                  placeholder="/Product/Product.jpg"
-                />
-              </label>
-              <label>
-                <span>Image URL</span>
-                <textarea
-                  value={editor.ImageUrl || ''}
-                  onChange={(event) => updateEditor('ImageUrl', event.target.value)}
-                  placeholder="https://..."
-                />
-              </label>
             </div>
           </div>
           <div className="master-editor-actions">
