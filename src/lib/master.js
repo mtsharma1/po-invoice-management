@@ -78,24 +78,35 @@ export async function getMasterScreenData(poBarcode = '') {
          d.FactoryDispatchDate,
          d.path_display,
          d.ImageUrl,
-         COALESCE((
-           SELECT MAX(
-             CASE
-               WHEN imageRow.ImageData3 IS NOT NULL AND OCTET_LENGTH(imageRow.ImageData3) > 0 THEN 3
-               WHEN imageRow.ImageData2 IS NOT NULL AND OCTET_LENGTH(imageRow.ImageData2) > 0 THEN 2
-               WHEN imageRow.ImageData IS NOT NULL AND OCTET_LENGTH(imageRow.ImageData) > 0 THEN 1
-               ELSE 0
-             END
-           )
-           FROM tblPODetails imageRow
-           WHERE (
-             NULLIF(TRIM(d.VendorArticleName), '') IS NOT NULL
-             AND imageRow.VendorArticleName = d.VendorArticleName
-           )
-           OR imageRow.POID = d.POID
-         ), 0) AS ImageCount
+         COALESCE(
+           articleImages.ImageCount,
+           CASE
+             WHEN d.ImageData3 IS NOT NULL THEN 3
+             WHEN d.ImageData2 IS NOT NULL THEN 2
+             WHEN d.ImageData IS NOT NULL THEN 1
+             ELSE 0
+           END
+         ) AS ImageCount
        FROM tblPODetails d
        INNER JOIN tblPOHeaders h ON h.POBarcode = d.POBarcode
+       LEFT JOIN (
+         SELECT
+           VendorArticleName,
+           MAX(
+             CASE
+               WHEN ImageData3 IS NOT NULL THEN 3
+               WHEN ImageData2 IS NOT NULL THEN 2
+               WHEN ImageData IS NOT NULL THEN 1
+               ELSE 0
+             END
+           ) AS ImageCount
+         FROM tblPODetails
+         WHERE VendorArticleName IS NOT NULL
+           AND (ImageData IS NOT NULL OR ImageData2 IS NOT NULL OR ImageData3 IS NOT NULL)
+         GROUP BY VendorArticleName
+       ) articleImages
+         ON articleImages.VendorArticleName = d.VendorArticleName
+        AND NULLIF(TRIM(d.VendorArticleName), '') IS NOT NULL
        ${where}
        ORDER BY d.POBarcode DESC, d.POID
        LIMIT 5000`,
