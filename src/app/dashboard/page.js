@@ -7,33 +7,35 @@ import { safeData } from '@/lib/safeData';
 
 export const dynamic = 'force-dynamic';
 
-const emptyCategory = {
-  pendingOrders: 0,
-  dispatchedLastMonth: 0,
-  dispatchAverageLastMonth: 0,
-  daysOrderInHand: 0,
-};
-
 export default async function DashboardPage() {
   const { data, error } = await safeData(getDashboardStats, {
     periodLabel: '',
-    suitcase: emptyCategory,
-    backpack: emptyCategory,
+    categories: [],
   });
+  const accents = ['blue', 'green', 'amber', 'violet'];
 
   return (
     <AppShell>
       <PageHeader eyebrow="OPERATIONS" title="DASHBOARD" />
       <DataError error={error} />
       <section className="operations-dashboard">
-        <DashboardCategory title="SuitCase" data={data.suitcase} period={data.periodLabel} accent="blue" />
-        <DashboardCategory title="BackPack" data={data.backpack} period={data.periodLabel} accent="green" />
+        {data.categories.map((category, index) => (
+          <DashboardCategory
+            key={category.categoryName}
+            title={category.categoryName}
+            data={category}
+            period={data.periodLabel}
+            accent={accents[index % accents.length]}
+          />
+        ))}
       </section>
     </AppShell>
   );
 }
 
 function DashboardCategory({ title, data, period, accent }) {
+  const daysTone = daysOrderTone(data.daysOrderInHand);
+
   return (
     <article className={`dashboard-category ${accent}`}>
       <header>
@@ -42,8 +44,14 @@ function DashboardCategory({ title, data, period, accent }) {
       </header>
       <div className="dashboard-metric-grid">
         <Metric label="Total pending orders" value={qty(data.pendingOrders)} note="Pending quantity" tone="pending" />
-        <Metric label="Dispatch average last month" value={numberText(data.dispatchAverageLastMonth)} note={`${qty(data.dispatchedLastMonth)} dispatched in ${period || 'current month'}`} tone="average" />
-        <Metric label="Days order in hand" value={qty(data.daysOrderInHand)} note="At 1,000 units per day" tone="days" />
+        <Metric
+          label="Days order in hand"
+          value={qty(data.daysOrderInHand)}
+          note="At 1,000 units per day"
+          tone={`days days-${daysTone}`}
+        />
+        <Metric label="Dispatch average last month" value={numberText(data.dispatchAverageLastMonth)} note={`${qty(data.dispatchedLastMonth)} dispatched in ${period || 'last month'}`} tone="average" />
+        <Metric label="Yesterday dispatch" value={qty(data.yesterdayDispatch)} note="Previous calendar day" tone="yesterday" />
       </div>
     </article>
   );
@@ -61,4 +69,11 @@ function Metric({ label, value, note, tone }) {
 
 function numberText(value) {
   return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
+function daysOrderTone(value) {
+  const days = Number(value || 0);
+  if (days < 15) return 'critical';
+  if (days <= 20) return 'warning';
+  return 'healthy';
 }

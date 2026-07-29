@@ -7,6 +7,7 @@ import ActionIcon from './ActionIcon';
 const columns = [
   ['POID', 'POID'],
   ['POBarcode', 'PO Barcode'],
+  ['POImportDate', 'PO import date'],
   ['StyleId', 'Style ID'],
   ['SKUCode', 'SKU Code'],
   ['HSNCode', 'HSN Code'],
@@ -23,7 +24,10 @@ const columns = [
   ['EstimatedDeliveryDate', 'Estimated delivery date'],
   ['BillTo', 'Bill to'],
   ['ShipTo', 'Ship to'],
+  ['DeliveryDuration', 'Delivery duration'],
   ['FactoryDispatchDate', 'Factory dispatch date'],
+  ['path_display', 'Dropbox path'],
+  ['ImageUrl', 'Image URL'],
 ];
 
 const editorFields = [
@@ -48,6 +52,10 @@ export default function MasterWorkbench({ data, selectedPO }) {
   const router = useRouter();
   const [editor, setEditor] = useState(null);
   const [message, setMessage] = useState('');
+  const [imageViewer, setImageViewer] = useState(null);
+  const [imageSyncing, setImageSyncing] = useState(false);
+  const [databaseImageFile, setDatabaseImageFile] = useState(null);
+  const [databaseImageSaving, setDatabaseImageSaving] = useState(false);
   const [isPending, startTransition] = useTransition();
   const selectedSummary = data.purchaseOrders.find((row) => row.POBarcode === selectedPO);
 
@@ -59,6 +67,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
 
   function editRow(row) {
     setMessage('');
+    setDatabaseImageFile(null);
     setEditor({
       ...row,
       EstimatedDeliveryDate: dateInputValue(row.EstimatedDeliveryDate),
@@ -89,6 +98,67 @@ export default function MasterWorkbench({ data, selectedPO }) {
         setMessage(error.message);
       }
     });
+  }
+
+  async function syncMissingImages() {
+    if (imageSyncing) return;
+    try {
+      setImageSyncing(true);
+      setMessage('Fetching up to three Dropbox images for every vendor article…');
+      const response = await fetch('/api/master/images/import-dropbox', {
+        method: 'POST',
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || 'Image URLs could not be updated.');
+      }
+      const failedNames = (result.failures || [])
+        .slice(0, 10)
+        .map((failure) => failure.vendorArticleName);
+      const remainingFailures = Math.max(0, Number(result.failures?.length || 0) - failedNames.length);
+      const failureText = failedNames.length
+        ? ` Not found: ${failedNames.join(', ')}${remainingFailures ? ` and ${remainingFailures} more` : ''}.`
+        : '';
+      setMessage(`${result.message}${failureText}`);
+      setEditor(null);
+      router.refresh();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setImageSyncing(false);
+    }
+  }
+
+  async function saveDatabaseImage() {
+    if (!editor || !databaseImageFile || databaseImageSaving) return;
+    try {
+      setDatabaseImageSaving(true);
+      setMessage(`Saving ${databaseImageFile.name} in the database…`);
+      const formData = new FormData();
+      formData.set('POID', String(editor.POID));
+      formData.set('image', databaseImageFile);
+      const response = await fetch('/api/master/images/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || 'Database image could not be saved.');
+      }
+      setEditor((current) => ({
+        ...current,
+        path_display: '',
+        ImageUrl: result.ImageUrl,
+        ImageCount: 1,
+      }));
+      setDatabaseImageFile(null);
+      setMessage(result.message);
+      router.refresh();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setDatabaseImageSaving(false);
+    }
   }
 
   function deletePO() {
@@ -150,6 +220,14 @@ export default function MasterWorkbench({ data, selectedPO }) {
         <button className="master-delete" type="button" onClick={deletePO} disabled={!selectedPO || isPending}>
           <TrashIcon /> Delete PO
         </button>
+        <button
+          className="master-image-sync"
+          type="button"
+          onClick={syncMissingImages}
+          disabled={imageSyncing || isPending}
+        >
+          <ImageSyncIcon /> {imageSyncing ? 'Importing images…' : 'Update product images'}
+        </button>
         <div className="master-selection-summary">
           {selectedPO ? (
             <>
@@ -187,6 +265,47 @@ export default function MasterWorkbench({ data, selectedPO }) {
             <label className="master-editor-wide"><span>Bill to</span><textarea value={editor.BillTo || ''} onChange={(event) => updateEditor('BillTo', event.target.value)} /></label>
             <label className="master-editor-wide"><span>Ship to</span><textarea value={editor.ShipTo || ''} onChange={(event) => updateEditor('ShipTo', event.target.value)} /></label>
           </div>
+          <div className="master-image-editor">
+            <div className="master-image-editor-heading">
+              <div>
+                <p>Product image</p>
+                <h3>Image details</h3>
+                <span>Upload an image into the database or fetch one from Dropbox.</span>
+              </div>
+              {editor.ImageUrl ? (
+                <button
+                  className="master-image-view"
+                  type="button"
+                  onClick={() => setImageViewer({
+                    url: editor.ImageUrl,
+                    name: editor.VendorArticleName || `PO line ${editor.POID}`,
+                    count: Number(editor.ImageCount || 1),
+                    index: 1,
+                  })}
+                >
+                  View image
+                </button>
+              ) : null}
+            </div>
+            <div className="master-database-image-upload">
+              <label>
+                <span>Select image file from this computer</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(event) => setDatabaseImageFile(event.target.files?.[0] || null)}
+                />
+                <small>JPG, PNG, WebP or GIF · maximum 5 MB · saved inside MySQL, not Dropbox</small>
+              </label>
+              <button
+                type="button"
+                onClick={saveDatabaseImage}
+                disabled={!databaseImageFile || databaseImageSaving || isPending}
+              >
+                {databaseImageSaving ? 'Saving image…' : 'Save image in database'}
+              </button>
+            </div>
+          </div>
           <div className="master-editor-actions">
             <button className="master-save" type="button" onClick={saveLine} disabled={isPending}><ActionIcon name="save" /> {isPending ? 'Saving…' : 'Save changes'}</button>
             <button type="button" onClick={() => setEditor(null)} disabled={isPending}>Cancel</button>
@@ -207,7 +326,25 @@ export default function MasterWorkbench({ data, selectedPO }) {
               {data.rows.map((row) => (
                 <tr key={row.POID}>
                   <td className="master-action-column"><button type="button" onClick={() => editRow(row)}>Edit</button></td>
-                  {columns.map(([field]) => <td key={field} className={numericField(field) ? 'num' : ''}>{displayValue(field, row[field])}</td>)}
+                  {columns.map(([field]) => (
+                    <td key={field} className={numericField(field) ? 'num' : ''}>
+                      {field === 'ImageUrl' && row.ImageUrl ? (
+                        <button
+                          className="master-image-link"
+                          type="button"
+                          title={row.ImageUrl}
+                          onClick={() => setImageViewer({
+                            url: row.ImageUrl,
+                            name: row.VendorArticleName || `PO line ${row.POID}`,
+                            count: Number(row.ImageCount || 1),
+                            index: 1,
+                          })}
+                        >
+                          {row.ImageUrl}
+                        </button>
+                      ) : displayValue(field, row[field])}
+                    </td>
+                  ))}
                 </tr>
               ))}
               {!data.rows.length ? <tr><td className="master-empty" colSpan={columns.length + 1}>No master records found.</td></tr> : null}
@@ -215,6 +352,55 @@ export default function MasterWorkbench({ data, selectedPO }) {
           </table>
         </div>
       </section>
+
+      {imageViewer ? (
+        <div className="master-image-modal" role="presentation" onMouseDown={() => setImageViewer(null)}>
+          <section
+            className="master-image-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Image for ${imageViewer.name}`}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div><p>Product image</p><h2>{imageViewer.name}</h2></div>
+              <button type="button" onClick={() => setImageViewer(null)} aria-label="Close image viewer">
+                <ActionIcon name="clear" />
+              </button>
+            </header>
+            <div className="master-image-canvas">
+              <img src={currentViewerUrl(imageViewer)} alt={`${imageViewer.name} ${imageViewer.index}`} />
+            </div>
+            <footer>
+              {imageViewer.count > 1 ? (
+                <div className="master-image-navigation">
+                  <button
+                    type="button"
+                    onClick={() => setImageViewer((current) => ({
+                      ...current,
+                      index: current.index <= 1 ? current.count : current.index - 1,
+                    }))}
+                  >
+                    Previous
+                  </button>
+                  <span>{imageViewer.index} of {imageViewer.count}</span>
+                  <button
+                    type="button"
+                    onClick={() => setImageViewer((current) => ({
+                      ...current,
+                      index: current.index >= current.count ? 1 : current.index + 1,
+                    }))}
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : null}
+              <a href={currentViewerUrl(imageViewer)} target="_blank" rel="noreferrer">Open image in new tab</a>
+              <button type="button" onClick={() => setImageViewer(null)}>Close</button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -225,6 +411,18 @@ function numericField(field) {
 
 function displayValue(field, value) {
   if (value === null || value === undefined || value === '') return '—';
+  if (field === 'POImportDate') {
+    const raw = String(value).replace('T', ' ');
+    const date = raw.slice(0, 10);
+    const time = raw.slice(11, 16);
+    const [year, month, day] = date.split('-');
+    if (year && month && day) return `${day}-${month}-${year}${time ? ` ${time}` : ''}`;
+    return String(value);
+  }
+  if (field === 'DeliveryDuration') {
+    const days = Number(value);
+    return `${days.toLocaleString('en-IN')} ${days === 1 ? 'day' : 'days'}`;
+  }
   if (['EstimatedDeliveryDate', 'FactoryDispatchDate'].includes(field)) {
     const raw = String(value).slice(0, 10);
     const [year, month, day] = raw.split('-');
@@ -241,10 +439,27 @@ function dateInputValue(value) {
   return value ? String(value).slice(0, 10) : '';
 }
 
+function currentViewerUrl(viewer) {
+  if (!viewer?.url) return '';
+  if (!viewer.url.startsWith('/api/master/images/')) return viewer.url;
+  const separator = viewer.url.includes('?') ? '&' : '?';
+  return `${viewer.url}${separator}index=${viewer.index || 1}`;
+}
+
 function TrashIcon() {
   return (
     <svg className="action-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none">
       <path d="M4 7h16M9 7V4h6v3m-9 0 1 14h10l1-14M10 11v6m4-6v6" />
+    </svg>
+  );
+}
+
+function ImageSyncIcon() {
+  return (
+    <svg className="action-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m5 17 4-4 3 3 2-2 5 5M18 3v4m-2-2h4" />
     </svg>
   );
 }

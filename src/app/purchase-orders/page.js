@@ -2,7 +2,7 @@ import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { DataError, EmptyState } from '@/components/DataState';
 import PageHeader from '@/components/PageHeader';
-import { dateText, money, qty } from '@/lib/format';
+import { dateText, dateTimeText, money, qty } from '@/lib/format';
 import { listPurchaseOrders } from '@/lib/purchaseOrders';
 import { safeData } from '@/lib/safeData';
 
@@ -22,6 +22,7 @@ export default async function PurchaseOrdersPage() {
             <thead>
               <tr>
                 <th>PO Barcode</th>
+                <th>Imported</th>
                 <th>Approved</th>
                 <th>Vendor</th>
                 <th>GSTIN</th>
@@ -34,6 +35,7 @@ export default async function PurchaseOrdersPage() {
               {rows.map((row) => (
                 <tr key={row.POBarcode}>
                   <td><Link href={`/purchase-orders/${encodeURIComponent(row.POBarcode)}`}><strong>{row.POBarcode}</strong></Link></td>
+                  <td>{dateTimeText(row.POImportDate)}</td>
                   <td>{dateText(row.POApprovedDate)}</td>
                   <td>{row.VendorName}</td>
                   <td>{row.VendorGSTIN}</td>

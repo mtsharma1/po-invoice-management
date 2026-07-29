@@ -37,8 +37,10 @@ CREATE TABLE IF NOT EXISTS tblPOHeaders (
   VendorAddress TEXT NULL,
   Party VARCHAR(100) NULL,
   CreatedOn DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  POImportDate DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (POBarcode),
   INDEX IX_POApprovedDate (POApprovedDate),
+  INDEX IX_POImportDate (POImportDate),
   INDEX IX_EstimatedDeliveryDate (EstimatedDeliveryDate),
   INDEX IX_VendorName (VendorName),
   INDEX IX_VendorGSTIN (VendorGSTIN)
@@ -69,6 +71,14 @@ CREATE TABLE IF NOT EXISTS webSettings (
   PRIMARY KEY (SettingKey)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS webIntegrations (
+  IntegrationKey VARCHAR(100) NOT NULL,
+  SecretValue LONGTEXT NOT NULL,
+  MetadataJson LONGTEXT NULL,
+  UpdatedAt DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (IntegrationKey)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS webFileTemplates (
   TemplateKey VARCHAR(100) NOT NULL,
   FileName VARCHAR(255) NOT NULL,
@@ -79,6 +89,22 @@ CREATE TABLE IF NOT EXISTS webFileTemplates (
   CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (TemplateKey)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS webPOImportErrorLogs (
+  ErrorLogID BIGINT NOT NULL AUTO_INCREMENT,
+  BatchID VARCHAR(64) NOT NULL,
+  FileName VARCHAR(255) NOT NULL,
+  POBarcode VARCHAR(50) NULL,
+  WorksheetName VARCHAR(255) NULL,
+  ExcelRow INT NULL,
+  FieldName VARCHAR(255) NULL,
+  FailureReason TEXT NOT NULL,
+  ErrorDateTime DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (ErrorLogID),
+  INDEX IX_webPOImportErrorLogs_BatchID (BatchID),
+  INDEX IX_webPOImportErrorLogs_FileName (FileName),
+  INDEX IX_webPOImportErrorLogs_ErrorDateTime (ErrorDateTime)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS tblPODetails (
@@ -122,6 +148,11 @@ CREATE TABLE IF NOT EXISTS tblPODetails (
   FactoryDispatchDate DATETIME NULL,
   VendorPrefix VARCHAR(4) NULL,
   AvailableStock INT NULL DEFAULT 0,
+  path_display VARCHAR(1024) NULL,
+  ImageUrl VARCHAR(2048) NULL,
+  ImageData LONGBLOB NULL,
+  ImageData2 LONGBLOB NULL,
+  ImageData3 LONGBLOB NULL,
   PRIMARY KEY (POID),
   INDEX IX_POBarcode (POBarcode),
   INDEX IX_SKUCode (SKUCode),

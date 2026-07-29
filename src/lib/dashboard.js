@@ -1,9 +1,9 @@
 import { query } from './db';
 
-function accessDashboardMonth(reference = new Date()) {
+function previousDashboardMonth(reference = new Date()) {
+  const previousMonthStart = new Date(reference.getFullYear(), reference.getMonth() - 1, 1);
   const currentMonthStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
-  const nextMonthStart = new Date(reference.getFullYear(), reference.getMonth() + 1, 1);
-  const daysInCurrentMonth = new Date(reference.getFullYear(), reference.getMonth() + 1, 0).getDate();
+  const daysInPreviousMonth = new Date(reference.getFullYear(), reference.getMonth(), 0).getDate();
   const sqlDate = (value) => [
     value.getFullYear(),
     String(value.getMonth() + 1).padStart(2, '0'),
@@ -11,68 +11,107 @@ function accessDashboardMonth(reference = new Date()) {
   ].join('-');
 
   return {
-    from: sqlDate(currentMonthStart),
-    to: sqlDate(nextMonthStart),
-    days: daysInCurrentMonth,
-    label: currentMonthStart.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+    from: sqlDate(previousMonthStart),
+    to: sqlDate(currentMonthStart),
+    days: daysInPreviousMonth,
+    label: previousMonthStart.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
   };
 }
 
+const categoryExpression = `
+  CASE
+    WHEN LOWER(REPLACE(REPLACE(REPLACE(TRIM(COALESCE(p.Category, '')), ' ', ''), '-', ''), '_', '')) = 'suitcase'
+      THEN 'SuitCase'
+    WHEN LOWER(REPLACE(REPLACE(REPLACE(TRIM(COALESCE(p.Category, '')), ' ', ''), '-', ''), '_', '')) = 'backpack'
+      THEN 'BackPack'
+    WHEN LOWER(REPLACE(REPLACE(REPLACE(TRIM(COALESCE(p.Category, '')), ' ', ''), '-', ''), '_', '')) = 'smallhardcase'
+      THEN 'Small Hard Case'
+    WHEN NULLIF(TRIM(p.Category), '') IS NOT NULL THEN TRIM(p.Category)
+    WHEN LEFT(COALESCE(p.VendorArticleName, ''), 4) = 'T_TR' THEN 'SuitCase'
+    ELSE 'BackPack'
+  END
+`;
+
+const standardCategories = ['SuitCase', 'BackPack', 'Small Hard Case'];
+
 export async function getDashboardStats() {
-  const period = accessDashboardMonth();
-  const [pendingRows, dispatchRows] = await Promise.all([
+  const period = previousDashboardMonth();
+  const [pendingRows, dispatchRows, yesterdayRows] = await Promise.all([
     query(
       `SELECT Category, COALESCE(SUM(PendingQty), 0) AS PendingQty
        FROM (
          SELECT
-           CASE WHEN LEFT(COALESCE(p.VendorArticleName, ''), 4) = 'T_TR'
-                THEN 'SuitCase' ELSE 'BackPack' END AS Category,
-           COALESCE(p.Quantity, 0) - COALESCE(d.DispatchQty, 0) AS PendingQty
-         FROM vwPoDetails p
-         LEFT JOIN vwDispatchDetails d ON d.POID = p.POID
-         GROUP BY p.POBarcode, p.VendorArticleName, p.Quantity, d.DispatchQty,
-           CASE WHEN LEFT(COALESCE(p.VendorArticleName, ''), 4) = 'T_TR'
-                THEN 'SuitCase' ELSE 'BackPack' END
-       ) accessPending
+           ${categoryExpression} AS Category,
+           GREATEST(COALESCE(p.Quantity, 0) - COALESCE(d.DispatchQty, 0), 0) AS PendingQty
+         FROM tblPODetails p
+         LEFT JOIN (
+           SELECT POID, COALESCE(SUM(DispatchQty), 0) AS DispatchQty
+           FROM tblDispatch
+           GROUP BY POID
+         ) d ON d.POID = p.POID
+       ) categoryPending
        GROUP BY Category`
     ),
     query(
       `SELECT
-         CASE WHEN COALESCE(d.VendorPrefix, '') = 'T_TR'
-              THEN 'SuitCase' ELSE 'BackPack' END AS Category,
+         ${categoryExpression} AS Category,
          COALESCE(SUM(d.DispatchQty), 0) AS DispatchQty
-       FROM vwDispatchDetails d
+       FROM tblDispatch d
+       INNER JOIN tblPODetails p ON p.POID = d.POID
        WHERE d.DispatchDate >= ?
          AND d.DispatchDate < ?
-       GROUP BY CASE WHEN COALESCE(d.VendorPrefix, '') = 'T_TR'
-                     THEN 'SuitCase' ELSE 'BackPack' END`,
+       GROUP BY ${categoryExpression}`,
       [period.from, period.to]
+    ),
+    query(
+      `SELECT
+         ${categoryExpression} AS Category,
+         COALESCE(SUM(d.DispatchQty), 0) AS DispatchQty
+       FROM tblDispatch d
+       INNER JOIN tblPODetails p ON p.POID = d.POID
+       WHERE d.DispatchDate >= CURRENT_DATE - INTERVAL 1 DAY
+         AND d.DispatchDate < CURRENT_DATE
+       GROUP BY ${categoryExpression}`
     ),
   ]);
 
-  const pendingByCategory = Object.fromEntries(
-    pendingRows.map((row) => [row.Category, Number(row.PendingQty || 0)])
-  );
-  const dispatchByCategory = Object.fromEntries(
-    dispatchRows.map((row) => [row.Category, Number(row.DispatchQty || 0)])
-  );
+  const pendingByCategory = rowsToQuantityMap(pendingRows, 'PendingQty');
+  const dispatchByCategory = rowsToQuantityMap(dispatchRows, 'DispatchQty');
+  const yesterdayByCategory = rowsToQuantityMap(yesterdayRows, 'DispatchQty');
+  const discoveredCategories = new Set([
+    ...Object.keys(pendingByCategory),
+    ...Object.keys(dispatchByCategory),
+    ...Object.keys(yesterdayByCategory),
+  ]);
+  const categoryNames = [
+    ...standardCategories,
+    ...Array.from(discoveredCategories)
+      .filter((category) => !standardCategories.includes(category))
+      .sort((left, right) => left.localeCompare(right, 'en-IN', { sensitivity: 'base' })),
+  ];
 
-  const categoryStats = (category) => {
-    const pendingOrders = pendingByCategory[category] || 0;
-    const dispatchedLastMonth = dispatchByCategory[category] || 0;
+  const categories = categoryNames.map((categoryName) => {
+    const pendingOrders = pendingByCategory[categoryName] || 0;
+    const dispatchedLastMonth = dispatchByCategory[categoryName] || 0;
     return {
+      categoryName,
       pendingOrders,
       dispatchedLastMonth,
       dispatchAverageLastMonth: dispatchedLastMonth / period.days,
-      // The Access Backpack function currently evaluates its own empty return value,
-      // so it always displays zero. Preserve that behavior for an exact dashboard match.
-      daysOrderInHand: category === 'BackPack' ? 0 : Math.round(pendingOrders / 1000),
+      daysOrderInHand: Math.round(pendingOrders / 1000),
+      yesterdayDispatch: yesterdayByCategory[categoryName] || 0,
     };
-  };
+  });
 
   return {
     periodLabel: period.label,
-    suitcase: categoryStats('SuitCase'),
-    backpack: categoryStats('BackPack'),
+    categories,
   };
+}
+
+function rowsToQuantityMap(rows, quantityColumn) {
+  return Object.fromEntries(
+    rows.map((row) => [String(row.Category || '').trim(), Number(row[quantityColumn] || 0)])
+      .filter(([category]) => category)
+  );
 }

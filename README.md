@@ -57,3 +57,21 @@ If creating a fresh database, start from `database/schema.sql` and then import d
 ## Invoice Duplicate Protection
 
 The web invoice query does not join invoice lines directly to all matching header records. It chooses one usable header per invoice number and groups lines by PO item, which prevents the duplicate-row issue seen earlier when `tblInvoiceHeader` contained duplicate `InvoiceNo` records.
+
+## Dropbox OAuth
+
+The administrator Settings page includes a Dropbox connection flow. Configure these
+server-only environment variables before using it:
+
+```env
+DROPBOX_APP_KEY=your_dropbox_app_key
+DROPBOX_APP_SECRET=your_dropbox_app_secret
+DROPBOX_REDIRECT_URI=http://localhost:3000/api/dropbox/oauth/callback
+```
+
+Register the exact `DROPBOX_REDIRECT_URI` in Dropbox App Console under
+**Settings → OAuth 2 → Redirect URIs**. Enable the required Dropbox scopes before
+connecting. The callback exchanges the one-time authorization code for a refresh
+token and stores that token AES-256-GCM encrypted in `webIntegrations`, using
+`APP_SESSION_SECRET` as the encryption-key source. Changing `APP_SESSION_SECRET`
+after connecting requires reconnecting Dropbox.
