@@ -73,7 +73,10 @@ export async function getInvoice(invoiceNo) {
        ROW_NUMBER() OVER (ORDER BY pd.POID) AS SlNo,
        pd.POID,
        pd.POBarcode,
-       pd.SKUCode,
+       CASE
+         WHEN NULLIF(TRIM(pd.SKUCode), '') IS NOT NULL THEN pd.SKUCode
+         ELSE pd.VendorArticleName
+       END AS SKUCode,
        pd.StyleId,
        pd.HSNCode,
        pd.VendorArticleName,
