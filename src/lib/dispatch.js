@@ -1,5 +1,31 @@
 import { query, withTransaction } from './db';
 import { getShellOrderContext, listPOBarcodes } from './shellOrders';
+import { getWebSettings } from './settings';
+
+const defaultInvoiceBankDetails = {
+  accountNo: '6811361613',
+  bankName: 'KOTAK MAHINDRA BANK LTD.',
+  branchName: 'SEC-14, GURGAON',
+  ifscCode: 'KKBK0000287',
+};
+
+const defaultInvoicePartyDetails = {
+  gstn: '06BMTPS4959L1ZX',
+  billFromName: 'TEAKWOOD',
+  billFromAddress: [
+    'PLOT NO -56 2ND FLOOR IDC MEHRAULI ROAD,',
+    'Gurugram, Haryana,Gurgaon,Haryana,122001',
+    'Haryana (06),122001 India,',
+    'PH NO-9818328886,',
+    'GSTN- 06BMTPS4959L1ZX',
+  ].join('\n'),
+  dispatchFromName: 'TEAKWOOD',
+  dispatchFromAddress: [
+    'Plot no.11, Street no. 2, Sector-4,',
+    'Model Econonic Township,',
+    'Dadri Toe, jhajjar,Haryana,124103',
+  ].join('\n'),
+};
 
 export async function listDispatchRows(limit = 200) {
   return query(
@@ -283,6 +309,14 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
   if (!poBarcode) throw new Error('Please enter PO number before posting the entry.');
   if (!invoiceNo) throw new Error('Please enter an invoice number before posting the entry.');
 
+  const settings = await getWebSettings();
+  const bankDetails = {
+    accountNo: String(settings.accountNo || '').trim() || defaultInvoiceBankDetails.accountNo,
+    bankName: String(settings.bankName || '').trim() || defaultInvoiceBankDetails.bankName,
+    branchName: String(settings.branchName || '').trim() || defaultInvoiceBankDetails.branchName,
+    ifscCode: String(settings.ifscCode || '').trim() || defaultInvoiceBankDetails.ifscCode,
+  };
+
   return withTransaction(async (run) => {
     await ensureWebDispatchTables(run);
 
@@ -293,6 +327,12 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
     if (existingInvoiceRows.length) {
       throw new Error('The specified invoice number has already been used. Please enter a different invoice number.');
     }
+
+    const poHeaderRows = await run(
+      'SELECT BillTo, ShipTo FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1',
+      [poBarcode]
+    );
+    const poHeader = poHeaderRows[0] || {};
 
     const pendingRows = await run(
       `SELECT WTDID
@@ -347,8 +387,27 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
     );
 
     await run(
-      'INSERT INTO tblInvoiceHeader (POBarcode, InvoiceNo) VALUES (?, ?)',
-      [poBarcode, invoiceNo]
+      `INSERT INTO tblInvoiceHeader
+         (POBarcode, InvoiceNo, GSTN,
+          BillFromName, BillFromAddress, DispatchFromName, DispatchFromAddress,
+          ConsigneeAddress, DeliveredToAddress,
+          AccountNo, BankName, BranchName, IFSCCode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        poBarcode,
+        invoiceNo,
+        defaultInvoicePartyDetails.gstn,
+        defaultInvoicePartyDetails.billFromName,
+        defaultInvoicePartyDetails.billFromAddress,
+        defaultInvoicePartyDetails.dispatchFromName,
+        defaultInvoicePartyDetails.dispatchFromAddress,
+        String(poHeader.BillTo || '').trim(),
+        String(poHeader.ShipTo || '').trim(),
+        bankDetails.accountNo,
+        bankDetails.bankName,
+        bankDetails.branchName,
+        bankDetails.ifscCode,
+      ]
     );
 
     return {
