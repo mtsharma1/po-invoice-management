@@ -5,7 +5,7 @@ import {
   findDropboxImageFiles,
   listDropboxImageFiles,
 } from './dropbox';
-import { ensurePODetailImageColumns, ensurePOImportDateColumn } from './poSchema';
+import { ensurePOConsigneeNameColumn, ensurePODetailImageColumns, ensurePOImportDateColumn } from './poSchema';
 
 const editableLineFields = Object.freeze({
   StyleId: 'StyleId',
@@ -28,7 +28,11 @@ const editableLineFields = Object.freeze({
 });
 
 export async function getMasterScreenData(poBarcode = '') {
-  await Promise.all([ensurePOImportDateColumn(), ensurePODetailImageColumns()]);
+  await Promise.all([
+    ensurePOImportDateColumn(),
+    ensurePOConsigneeNameColumn(),
+    ensurePODetailImageColumns(),
+  ]);
 
   const selectedPO = String(poBarcode || '').trim();
   const where = selectedPO ? 'WHERE d.POBarcode = ?' : '';
@@ -69,6 +73,7 @@ export async function getMasterScreenData(poBarcode = '') {
          d.EstimatedDeliveryDate,
          h.BillTo,
          h.ShipTo,
+         h.ConsigneeName,
          CASE
            WHEN LOWER(COALESCE(h.ShipTo, '')) REGEXP 'delhi|haryana' THEN 1
            WHEN LOWER(COALESCE(h.ShipTo, '')) REGEXP 'uttar[[:space:].-]*pradesh|(^|[^a-z])u[.]?[[:space:]]*p[.]?([^a-z]|$)|rajasthan' THEN 2
@@ -123,7 +128,7 @@ export async function getMasterScreenData(poBarcode = '') {
 }
 
 export async function saveMasterLine(payload) {
-  await ensurePODetailImageColumns();
+  await Promise.all([ensurePOConsigneeNameColumn(), ensurePODetailImageColumns()]);
   const poid = Number(payload?.POID || 0);
   if (!Number.isInteger(poid) || poid <= 0) throw new Error('A valid PO line is required.');
 
@@ -149,8 +154,15 @@ export async function saveMasterLine(payload) {
     );
 
     await run(
-      `UPDATE tblPOHeaders SET BillTo = ?, ShipTo = ? WHERE POBarcode = ?`,
-      [String(payload?.BillTo || ''), String(payload?.ShipTo || ''), currentRows[0].POBarcode]
+      `UPDATE tblPOHeaders
+       SET BillTo = ?, ShipTo = ?, ConsigneeName = ?
+       WHERE POBarcode = ?`,
+      [
+        String(payload?.BillTo || ''),
+        String(payload?.ShipTo || ''),
+        String(payload?.ConsigneeName || ''),
+        currentRows[0].POBarcode,
+      ]
     );
 
     return { message: `PO line ${poid} updated successfully.` };

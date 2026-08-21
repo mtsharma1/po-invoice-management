@@ -1,8 +1,8 @@
 import { query } from './db';
-import { ensurePOImportDateColumn } from './poSchema';
+import { ensurePOConsigneeNameColumn, ensurePOImportDateColumn } from './poSchema';
 
 export async function listPurchaseOrders(limit = 100) {
-  await ensurePOImportDateColumn();
+  await Promise.all([ensurePOImportDateColumn(), ensurePOConsigneeNameColumn()]);
 
   return query(
     `SELECT
@@ -27,7 +27,7 @@ export async function listPurchaseOrders(limit = 100) {
 }
 
 export async function getPurchaseOrder(poBarcode) {
-  await ensurePOImportDateColumn();
+  await Promise.all([ensurePOImportDateColumn(), ensurePOConsigneeNameColumn()]);
 
   const headers = await query('SELECT * FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1', [poBarcode]);
   const lines = await query(

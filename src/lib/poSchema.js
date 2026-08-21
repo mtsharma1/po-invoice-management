@@ -24,6 +24,17 @@ export async function ensurePODetailImageColumns() {
   return globalForPOSchema.__teakwoodPODetailImageSchema;
 }
 
+export async function ensurePOConsigneeNameColumn() {
+  if (!globalForPOSchema.__teakwoodPOConsigneeNameSchemaV1) {
+    globalForPOSchema.__teakwoodPOConsigneeNameSchemaV1 = applyPOConsigneeNameSchema().catch((error) => {
+      delete globalForPOSchema.__teakwoodPOConsigneeNameSchemaV1;
+      throw error;
+    });
+  }
+
+  return globalForPOSchema.__teakwoodPOConsigneeNameSchemaV1;
+}
+
 async function applyPOImportDateSchema() {
   const rows = await query(
     `SELECT COLUMN_DEFAULT AS columnDefault
@@ -50,6 +61,23 @@ async function applyPOImportDateSchema() {
      SET POImportDate = COALESCE(CreatedOn, POApprovedDate, CURRENT_TIMESTAMP)
      WHERE POImportDate IS NULL`
   );
+
+}
+
+async function applyPOConsigneeNameSchema() {
+  const consigneeColumns = await query(
+    `SELECT COLUMN_NAME AS columnName
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'tblPOHeaders'
+       AND COLUMN_NAME = 'ConsigneeName'`
+  );
+  if (!consigneeColumns.length) {
+    await query(
+      `ALTER TABLE tblPOHeaders
+       ADD COLUMN ConsigneeName VARCHAR(255) NULL AFTER VendorAddress`
+    );
+  }
 }
 
 async function applyPODetailImageSchema() {

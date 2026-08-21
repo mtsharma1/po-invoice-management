@@ -323,6 +323,7 @@ export default function ImportWorkbench({ header, rows }) {
             <PreviewMemo label="Bill To" value={header?.BillTo} />
             <PreviewMemo label="Ship To" value={header?.ShipTo} />
             <PreviewMemo label="Vendor Address" value={header?.VendorAddress} />
+            <PreviewField label="Consignee Name" value={header?.ConsigneeName} />
           </div>
         </div>
       </div>

@@ -15,6 +15,7 @@ export async function getShellOrderContext(poBarcode) {
        VendorGSTIN,
        ShipTo,
        BillTo,
+       ConsigneeName,
        POApprovedDate,
        EstimatedDeliveryDate
      FROM tblPOHeaders
