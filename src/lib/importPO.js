@@ -1,5 +1,5 @@
 import { query, withTransaction } from './db';
-import { ensurePOImportDateColumn } from './poSchema';
+import { ensurePOConsigneeNameColumn, ensurePOImportDateColumn } from './poSchema';
 
 const headerColumns = [
   'POBarcode',
@@ -11,6 +11,7 @@ const headerColumns = [
   'BillTo',
   'ShipTo',
   'VendorAddress',
+  'ConsigneeName',
 ];
 
 const detailColumns = [
@@ -223,7 +224,7 @@ export async function stagePurchaseOrderWorkbook(sessionId, fileBuffer) {
 }
 
 export async function saveStagedPurchaseOrder(sessionId) {
-  await ensurePOImportDateColumn();
+  await Promise.all([ensurePOImportDateColumn(), ensurePOConsigneeNameColumn()]);
 
   return withTransaction(async (run) => {
     await ensureWebImportTables(run);
@@ -277,7 +278,7 @@ export async function saveStagedPurchaseOrder(sessionId) {
 
 export async function importPurchaseOrderWorkbook(fileBuffer) {
   const { header, details } = await parsePurchaseOrderWorkbook(fileBuffer);
-  await ensurePOImportDateColumn();
+  await Promise.all([ensurePOImportDateColumn(), ensurePOConsigneeNameColumn()]);
 
   return withTransaction(async (run) => {
     const existing = await run('SELECT POBarcode FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1', [header.POBarcode]);
@@ -415,11 +416,26 @@ export async function ensureWebImportTables(run = query) {
        BillTo TEXT NULL,
        ShipTo TEXT NULL,
        VendorAddress TEXT NULL,
+       ConsigneeName VARCHAR(255) NULL,
        CreatedAt DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
        PRIMARY KEY (SessionId),
        INDEX IX_webTmpPOHeaders_POBarcode (POBarcode)
      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
   );
+
+  const temporaryHeaderColumns = await run(
+    `SELECT COLUMN_NAME AS columnName
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'webTmpPOHeaders'
+       AND COLUMN_NAME = 'ConsigneeName'`
+  );
+  if (!temporaryHeaderColumns.length) {
+    await run(
+      `ALTER TABLE webTmpPOHeaders
+       ADD COLUMN ConsigneeName VARCHAR(255) NULL AFTER VendorAddress`
+    );
+  }
 
   await run(
     `CREATE TABLE IF NOT EXISTS webTmpPODetails (
@@ -544,6 +560,7 @@ function readPOHeader(worksheet) {
     BillTo: valueByLabel(worksheet, 'Bill To'),
     ShipTo: valueByLabel(worksheet, 'Ship To'),
     VendorAddress: valueByLabel(worksheet, 'Vendor Address'),
+    ConsigneeName: valueByLabel(worksheet, 'CONSIGNEE NAME'),
   };
 }
 

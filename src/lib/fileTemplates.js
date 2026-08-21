@@ -26,22 +26,28 @@ export async function ensureFileTemplatesTable(run = query) {
 export async function ensurePOTemplateRecord(run = query) {
   await ensureFileTemplatesTable(run);
 
+  const fileData = await readBundledPOTemplate();
+  const fileHash = createHash('sha256').update(fileData).digest('hex');
+
   const existing = await run(
-    `SELECT TemplateKey
+    `SELECT TemplateKey, FileHash
      FROM webFileTemplates
      WHERE TemplateKey = ?
      LIMIT 1`,
     [PO_TEMPLATE_KEY]
   );
-  if (existing.length) return;
-
-  const fileData = await readBundledPOTemplate();
-  const fileHash = createHash('sha256').update(fileData).digest('hex');
+  if (existing[0]?.FileHash === fileHash) return;
 
   await run(
-    `INSERT IGNORE INTO webFileTemplates
+    `INSERT INTO webFileTemplates
        (TemplateKey, FileName, MimeType, FileData, FileSize, FileHash)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       FileName = VALUES(FileName),
+       MimeType = VALUES(MimeType),
+       FileData = VALUES(FileData),
+       FileSize = VALUES(FileSize),
+       FileHash = VALUES(FileHash)`,
     [
       PO_TEMPLATE_KEY,
       PO_TEMPLATE_FILE_NAME,

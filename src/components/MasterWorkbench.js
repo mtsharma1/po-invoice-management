@@ -24,6 +24,7 @@ const columns = [
   ['EstimatedDeliveryDate', 'Estimated delivery date'],
   ['BillTo', 'Bill to'],
   ['ShipTo', 'Ship to'],
+  ['ConsigneeName', 'Consignee name'],
   ['DeliveryDuration', 'Delivery duration'],
   ['FactoryDispatchDate', 'Factory dispatch date'],
   ['path_display', 'Dropbox path'],
@@ -264,6 +265,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
             ))}
             <label className="master-editor-wide"><span>Bill to</span><textarea value={editor.BillTo || ''} onChange={(event) => updateEditor('BillTo', event.target.value)} /></label>
             <label className="master-editor-wide"><span>Ship to</span><textarea value={editor.ShipTo || ''} onChange={(event) => updateEditor('ShipTo', event.target.value)} /></label>
+            <label className="master-editor-wide"><span>Consignee name</span><input value={editor.ConsigneeName || ''} onChange={(event) => updateEditor('ConsigneeName', event.target.value)} /></label>
           </div>
           <div className="master-image-editor">
             <div className="master-image-editor-heading">

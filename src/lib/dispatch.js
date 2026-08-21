@@ -1,6 +1,7 @@
 import { query, withTransaction } from './db';
 import { getShellOrderContext, listPOBarcodes } from './shellOrders';
 import { getWebSettings } from './settings';
+import { ensurePOConsigneeNameColumn } from './poSchema';
 
 const defaultInvoiceBankDetails = {
   accountNo: '6811361613',
@@ -309,6 +310,8 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
   if (!poBarcode) throw new Error('Please enter PO number before posting the entry.');
   if (!invoiceNo) throw new Error('Please enter an invoice number before posting the entry.');
 
+  await ensurePOConsigneeNameColumn();
+
   const settings = await getWebSettings();
   const bankDetails = {
     accountNo: String(settings.accountNo || '').trim() || defaultInvoiceBankDetails.accountNo,
@@ -329,7 +332,7 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
     }
 
     const poHeaderRows = await run(
-      'SELECT BillTo, ShipTo FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1',
+      'SELECT BillTo, ShipTo, ConsigneeName FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1',
       [poBarcode]
     );
     const poHeader = poHeaderRows[0] || {};
@@ -390,9 +393,9 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
       `INSERT INTO tblInvoiceHeader
          (POBarcode, InvoiceNo, GSTN,
           BillFromName, BillFromAddress, DispatchFromName, DispatchFromAddress,
-          ConsigneeAddress, DeliveredToAddress,
+          ConsigneeName, ConsigneeAddress, DeliveredToName, DeliveredToAddress,
           AccountNo, BankName, BranchName, IFSCCode)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         poBarcode,
         invoiceNo,
@@ -401,7 +404,9 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
         defaultInvoicePartyDetails.billFromAddress,
         defaultInvoicePartyDetails.dispatchFromName,
         defaultInvoicePartyDetails.dispatchFromAddress,
+        String(poHeader.ConsigneeName || '').trim(),
         String(poHeader.BillTo || '').trim(),
+        String(poHeader.ConsigneeName || '').trim(),
         String(poHeader.ShipTo || '').trim(),
         bankDetails.accountNo,
         bankDetails.bankName,
