@@ -4,6 +4,7 @@ export const FEATURES = Object.freeze({
   SHELL_ORDERS: 'shell-orders',
   DISPATCH: 'dispatch',
   CUSTOMER_INVOICE: 'customer-invoice',
+  E_INVOICE: 'e-invoice',
   INVOICE_REPORTS: 'invoice-reports',
   IMPORT_PO: 'import-po',
   SETTINGS: 'settings',
@@ -14,7 +15,7 @@ const accessFeatures = Object.freeze({
   5: Object.values(FEATURES),
   6: [FEATURES.DASHBOARD, FEATURES.PURCHASE_ORDERS, FEATURES.DISPATCH, FEATURES.IMPORT_PO],
   7: [FEATURES.DASHBOARD, FEATURES.SHELL_ORDERS],
-  8: [FEATURES.DASHBOARD, FEATURES.CUSTOMER_INVOICE, FEATURES.INVOICE_REPORTS],
+  8: [FEATURES.DASHBOARD, FEATURES.CUSTOMER_INVOICE, FEATURES.E_INVOICE, FEATURES.INVOICE_REPORTS],
 });
 
 const pathFeatures = [
@@ -22,6 +23,7 @@ const pathFeatures = [
   ['/api/settings', FEATURES.SETTINGS],
   ['/api/master', FEATURES.PURCHASE_ORDERS],
   ['/api/customer-invoice', FEATURES.CUSTOMER_INVOICE],
+  ['/api/e-invoice', FEATURES.E_INVOICE],
   ['/api/shell-orders', FEATURES.SHELL_ORDERS],
   ['/api/dispatch', FEATURES.DISPATCH],
   ['/api/invoices', FEATURES.INVOICE_REPORTS],
@@ -29,6 +31,7 @@ const pathFeatures = [
   ['/purchase-orders', FEATURES.PURCHASE_ORDERS],
   ['/master', FEATURES.PURCHASE_ORDERS],
   ['/customer-invoice', FEATURES.CUSTOMER_INVOICE],
+  ['/e-invoice', FEATURES.E_INVOICE],
   ['/shell-orders', FEATURES.SHELL_ORDERS],
   ['/dashboard', FEATURES.DASHBOARD],
   ['/dispatch', FEATURES.DISPATCH],
