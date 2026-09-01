@@ -296,9 +296,9 @@ function buildItem(line, index, gstRate, useIgst, withoutPayment) {
   const totalAmount = roundMoney(number(line.Amount) || qty * unitPrice);
   const taxableAmount = totalAmount;
   const taxableRate = GST_RATES.has(number(gstRate)) ? number(gstRate) : 18;
-  const igstAmount = !withoutPayment && useIgst ? roundMoney(taxableAmount * taxableRate / 100) : 0;
-  const cgstAmount = !withoutPayment && !useIgst ? roundMoney(taxableAmount * taxableRate / 200) : 0;
-  const sgstAmount = !withoutPayment && !useIgst ? roundMoney(taxableAmount * taxableRate / 200) : 0;
+  const igstAmount = !withoutPayment && useIgst ? percentageMoney(taxableAmount, taxableRate, 100) : 0;
+  const cgstAmount = !withoutPayment && !useIgst ? percentageMoney(taxableAmount, taxableRate, 200) : 0;
+  const sgstAmount = !withoutPayment && !useIgst ? percentageMoney(taxableAmount, taxableRate, 200) : 0;
   return {
     SlNo: String(index + 1),
     PrdDesc: clean(line.VendorArticleName || line.SKUCode || line.StyleId).slice(0, 300),
@@ -665,7 +665,52 @@ function integerOrZero(value) {
 }
 
 function roundMoney(value) {
-  return Math.round((number(value) + Number.EPSILON) * 100) / 100;
+  return roundDecimal(number(value), 2);
+}
+
+function percentageMoney(amount, rate, divisor) {
+  const amountParts = decimalParts(amount);
+  const rateParts = decimalParts(rate);
+  const numerator = amountParts.integer * rateParts.integer * 100n;
+  const denominator = BigInt(divisor) * powerOfTen(amountParts.scale + rateParts.scale);
+  return Number(divideHalfUp(numerator, denominator)) / 100;
+}
+
+function roundDecimal(value, decimalPlaces) {
+  const parts = decimalParts(value);
+  const targetScale = Number(decimalPlaces);
+  if (parts.scale <= targetScale) {
+    return Number(parts.integer * powerOfTen(targetScale - parts.scale)) / (10 ** targetScale);
+  }
+  const divisor = powerOfTen(parts.scale - targetScale);
+  return Number(divideHalfUp(parts.integer, divisor)) / (10 ** targetScale);
+}
+
+function decimalParts(value) {
+  const numeric = number(value);
+  const sign = numeric < 0 ? -1n : 1n;
+  const [mantissa, exponentText = '0'] = Math.abs(numeric).toString().toLowerCase().split('e');
+  const [whole, fraction = ''] = mantissa.split('.');
+  const exponent = Number(exponentText);
+  const digits = `${whole}${fraction}`.replace(/^0+(?=\d)/, '') || '0';
+  const initialScale = fraction.length - exponent;
+  if (initialScale < 0) {
+    return { integer: sign * BigInt(digits) * powerOfTen(-initialScale), scale: 0 };
+  }
+  return { integer: sign * BigInt(digits), scale: initialScale };
+}
+
+function divideHalfUp(numerator, denominator) {
+  const sign = numerator < 0n ? -1n : 1n;
+  const absoluteNumerator = numerator < 0n ? -numerator : numerator;
+  const quotient = absoluteNumerator / denominator;
+  const remainder = absoluteNumerator % denominator;
+  const rounded = remainder * 2n >= denominator ? quotient + 1n : quotient;
+  return sign * rounded;
+}
+
+function powerOfTen(exponent) {
+  return 10n ** BigInt(exponent);
 }
 
 function roundQuantity(value) {
