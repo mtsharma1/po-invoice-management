@@ -34,6 +34,10 @@ const STATE_NAMES = Object.freeze({
 });
 
 const TRANSPORT_MODES = new Set(['1', '2', '3', '4']);
+const JSON_OUTPUT_OPTIONS = Object.freeze({
+  includeDispatchDetails: false,
+  includeFreeQuantity: false,
+});
 
 export async function getEInvoiceScreenData({ invoiceNo = '', search = '' } = {}) {
   const rows = await listInvoices(200);
@@ -222,7 +226,7 @@ function buildDocument(invoice, draft) {
     },
   };
 
-  if (draft.dispatch.enabled) {
+  if (JSON_OUTPUT_OPTIONS.includeDispatchDetails && draft.dispatch.enabled) {
     const dispatch = normalizedParty(draft.dispatch);
     document.DispDtls = {
       Nm: dispatch.LglNm,
@@ -305,7 +309,7 @@ function buildItem(line, index, gstRate, useIgst, withoutPayment) {
     IsServc: 'N',
     HsnCd: clean(line.HSNCode).replace(/\D/g, ''),
     Qty: qty,
-    FreeQty: 0,
+    ...(JSON_OUTPUT_OPTIONS.includeFreeQuantity ? { FreeQty: 0 } : {}),
     Unit: unitCode(line.Size),
     UnitPrice: unitPrice,
     TotAmt: totalAmount,
@@ -484,7 +488,8 @@ function parsePartyAddress(rawValue, defaults = {}) {
     ? gstin.slice(0, 2)
     : stateCodeFromAddress(raw) || clean(defaults.fallbackState);
   const location = locationFromAddress(addressLines, stateCode, pin);
-  const { addr1, addr2 } = splitAddress(addressLines.join(', '), pin);
+  const cleanedAddress = cleanAddressForJson(addressLines, stateCode, pin);
+  const { addr1, addr2 } = splitAddress(cleanedAddress, pin);
   return {
     Gstin: gstin,
     LglNm: name || clean(defaults.name),
@@ -566,19 +571,72 @@ function stateCodeFromAddress(value) {
 
 function locationFromAddress(lines, stateCode, pin) {
   const stateName = STATE_NAMES[stateCode] || '';
-  const parts = lines.join(',').split(',').map((part) => clean(part)).filter(Boolean);
+  const address = lines.join(', ');
+  const labelledLocationPatterns = [
+    /\b(?:LOCATION|LOC|CITY|TOWN)\s*[:\-]\s*([A-Z][A-Z .'-]{1,49}?)(?=\s*(?:,|\b(?:BLOCK|DISTRICT|DIST|STATE|PIN|ZIP|POST|P\.?\s*O\.?)\b|$))/i,
+    /\b(?:P\.?\s*O\.?|POST\s+OFFICE)\s*[:\-]\s*([A-Z][A-Z .'-]{1,49}?)(?=\s*(?:,|\b(?:BLOCK|DISTRICT|DIST|STATE|PIN|ZIP)\b|$))/i,
+  ];
+  for (const pattern of labelledLocationPatterns) {
+    const labelledLocation = normalizeLocation(address.match(pattern)?.[1], stateName, stateCode, pin);
+    if (labelledLocation) return labelledLocation;
+  }
+
+  const parts = address.split(',').map((part) => clean(part)).filter(Boolean);
   const candidates = parts.filter((part) => {
     const upper = part.toUpperCase();
-    return upper !== stateName && !/^\d{6}$/.test(part) && upper !== 'INDIA' && !upper.includes(`(${stateCode})`);
+    return !upper.includes(stateName) && !/^\d{6}$/.test(part) && upper !== 'INDIA' && !upper.includes(`(${stateCode})`);
   });
-  const beforeState = parts.findLastIndex((part) => clean(part).toUpperCase() === stateName);
+  const beforeState = parts.findLastIndex((part) => clean(part).toUpperCase().includes(stateName));
   if (beforeState > 0) {
     for (let index = beforeState - 1; index >= 0; index -= 1) {
-      const candidate = clean(parts[index]).replace(pin, '').trim();
-      if (candidate && !/^(VILLAGE|PLOT|BLOCK|STREET|SECTOR|MODEL|IDC)\b/i.test(candidate)) return candidate.slice(0, 50).toUpperCase();
+      const candidate = normalizeLocation(parts[index], stateName, stateCode, pin);
+      if (candidate && !/^(VILLAGE|PLOT|BLOCK|STREET|SECTOR|MODEL|IDC|DISTRICT|DIST|POST|P\.?\s*O\.?)\b/i.test(candidate)) return candidate;
     }
   }
-  return clean(candidates.at(-1)).replace(pin, '').trim().slice(0, 50).toUpperCase();
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const candidate = normalizeLocation(candidates[index], stateName, stateCode, pin);
+    if (candidate && !/^(VILLAGE|PLOT|BLOCK|STREET|SECTOR|MODEL|IDC|DISTRICT|DIST|POST|P\.?\s*O\.?)\b/i.test(candidate)) return candidate;
+  }
+  return '';
+}
+
+function normalizeLocation(value, stateName, stateCode, pin) {
+  if (!value) return '';
+  const pinPattern = pin ? new RegExp(`\\b${escapeRegExp(pin)}\\b`, 'gi') : null;
+  const statePattern = stateName ? new RegExp(`\\b${escapeRegExp(stateName)}\\b`, 'gi') : null;
+  return clean(value)
+    .replace(pinPattern || /a^/, ' ')
+    .replace(statePattern || /a^/, ' ')
+    .replace(new RegExp(`\\(\\s*${escapeRegExp(stateCode)}\\s*\\)`, 'gi'), ' ')
+    .replace(/\bINDIA\b/gi, ' ')
+    .replace(/^[\s,;:\-]+|[\s,;:\-]+$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .slice(0, 50)
+    .toUpperCase();
+}
+
+function cleanAddressForJson(lines, stateCode, pin) {
+  const stateName = STATE_NAMES[stateCode] || '';
+  const statePattern = stateName ? new RegExp(`\\b${escapeRegExp(stateName)}\\b`, 'gi') : null;
+  const pinPattern = pin ? new RegExp(`\\b${escapeRegExp(pin)}\\b`, 'gi') : null;
+  const parts = lines.join(',').split(',').map((part) => clean(part)).filter(Boolean);
+  const lastStateIndex = parts.findLastIndex((part) => stateName && part.toUpperCase().includes(stateName));
+  const cleanedParts = parts.map((part, index) => {
+    let value = part
+      .replace(pinPattern || /a^/, ' ')
+      .replace(/\bINDIA\b/gi, ' ')
+      .replace(new RegExp(`\\(\\s*${escapeRegExp(stateCode)}\\s*\\)`, 'gi'), ' ');
+    const withoutState = statePattern ? value.replace(statePattern, ' ') : value;
+    const stateOnly = stateName && !withoutState.replace(/[\s,;:\-()]/g, '');
+    if (stateOnly || index === lastStateIndex) value = withoutState;
+    return value
+      .replace(/^[\s,;:\-]+|[\s,;:\-]+$/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }).filter(Boolean);
+  return [...new Set(cleanedParts.map((part) => part.toUpperCase()))]
+    .map((upperPart) => cleanedParts.find((part) => part.toUpperCase() === upperPart))
+    .join(', ');
 }
 
 function splitAddress(value, pin) {
@@ -594,6 +652,10 @@ function splitAddress(value, pin) {
     addr1: cleanValue.slice(0, splitAt).replace(/,\s*$/, '').trim(),
     addr2: cleanValue.slice(splitAt + (comma >= 20 ? 1 : 0)).trim().slice(0, 100),
   };
+}
+
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function sameAddress(left, right) {
