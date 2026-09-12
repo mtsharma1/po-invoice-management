@@ -33,7 +33,35 @@ npm run dev
 
 4. Open `http://localhost:3000`.
 
-## Database
+## WhiteBooks sandbox authentication
+
+Set the seven `WHITEBOOKS_*` variables listed in `.env.example` in your server's
+`.env.local` (or deployment environment), then restart the application. Use the
+IP address registered with WhiteBooks for `WHITEBOOKS_IP_ADDRESS`.
+Administrators can open Settings and select **Test authentication**.
+
+The server calls `GET https://apisandbox.whitebooks.in/einvoice/authenticate`
+with the email query parameter and the six credential headers. The browser only
+receives a success or sanitized error message; tokens and provider responses are
+never returned to the browser or logged. The server helper returns the token for
+future API calls; the test does not persist it.
+
+In the e-invoice workbench, validate the invoice and select **Generate sandbox IRN**.
+The server revalidates the invoice, obtains a fresh auth token, and posts the single
+invoice object to `/einvoice/type/GENERATE/version/V1_03`. Seller GSTIN must match
+the configured sandbox GSTIN. No sample invoice values are substituted.
+
+Sandbox requests and allowlisted results (including signed invoice/QR strings) are
+stored in `webWhitebooksSandboxIrn`, created on first use. Production `IRN` and
+`AckNo` fields remain untouched. Download the sandbox result from the workbench.
+Unique invoice/document reservations prevent duplicate concurrent submissions.
+Uncertain requests are blocked from resubmission, including after a timeout or
+restart; reconcile them through WhiteBooks by document details. Automated lookup
+and recovery are not yet implemented. Database access needs CREATE TABLE privileges.
+
+Run the mocked authentication checks with `node scripts/test-whitebooks.mjs`.
+
+## Database tables
 
 The app expects the existing production MySQL tables and views used by Access:
 

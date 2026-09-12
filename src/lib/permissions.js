@@ -19,6 +19,8 @@ const accessFeatures = Object.freeze({
 });
 
 const pathFeatures = [
+  ['/api/whitebooks/authenticate', FEATURES.SETTINGS],
+  ['/api/whitebooks/irn', FEATURES.E_INVOICE],
   ['/api/dropbox', FEATURES.SETTINGS],
   ['/api/settings', FEATURES.SETTINGS],
   ['/api/master', FEATURES.PURCHASE_ORDERS],

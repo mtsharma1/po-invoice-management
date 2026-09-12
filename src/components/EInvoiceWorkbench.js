@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { cloneElement, useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import ActionIcon from './ActionIcon';
+import WhitebooksIrnAction from './WhitebooksIrnAction';
 
 const supplyTypes = [
   ['B2B', 'B2B — Business to business'],
@@ -246,6 +247,8 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
               </div>
             </div>
 
+            <WhitebooksIrnAction key={draft.invoiceNo} draft={draft} validation={validation} disabled={isPending} onValidation={setValidation} />
+
             <Section title="Transaction & document" subtitle="Choose the IRP scenario; database identifiers remain linked to the selected invoice.">
               <div className="einvoice-form-grid cols-4">
                 <Field label="Supply type" fieldKey="tran.SupTyp" errors={errorsFor('tran.SupTyp')}><select value={draft.tran.SupTyp} onChange={(event) => updateSupply(event.target.value)}>{supplyTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
@@ -256,6 +259,17 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
                 <Field label="IGST on intra-state" fieldKey="tran.IgstOnIntra" errors={errorsFor('tran.IgstOnIntra')}><select value={draft.tran.IgstOnIntra} onChange={(event) => update('tran', 'IgstOnIntra', event.target.value)}><option value="N">No</option><option value="Y">Yes</option></select></Field>
                 <Field label="E-commerce GSTIN" fieldKey="tran.EcmGstin" errors={errorsFor('tran.EcmGstin')}><input value={draft.tran.EcmGstin} onChange={(event) => update('tran', 'EcmGstin', event.target.value.toUpperCase())} placeholder="Optional" /></Field>
                 <Field label="Existing IRN"><input value={draft.irn || 'Not generated'} readOnly title={draft.irn} /></Field>
+              </div>
+              <div className="einvoice-output-option">
+                <div>
+                  <strong>Item quantity output</strong>
+                  <p>Add the optional FreeQty field to every item in the prepared JSON.</p>
+                </div>
+                <Toggle
+                  checked={draft.outputOptions?.includeFreeQuantity}
+                  onChange={(checked) => update('outputOptions', 'includeFreeQuantity', checked)}
+                  label="Include Free Qty"
+                />
               </div>
             </Section>
 
@@ -410,9 +424,16 @@ function focusValidationError(entry) {
 
 function ItemsPanel({ items, values }) {
   if (!items.length) return null;
+  const showFreeQty = items.some((item) => Object.prototype.hasOwnProperty.call(item, 'FreeQty'));
   return (
     <Section title="Mapped item rows" subtitle="Product quantities and values are read from dispatched invoice lines; standard pieces use NOS.">
-      <div className="einvoice-item-scroll"><table className="einvoice-item-table"><thead><tr><th>Sl</th><th>Description</th><th>HSN</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Taxable</th><th>GST</th><th>Tax</th><th>Total</th></tr></thead><tbody>{items.map((item) => <tr key={item.SlNo}><td>{item.SlNo}</td><td>{item.PrdDesc}</td><td>{item.HsnCd}</td><td className="num">{item.Qty}</td><td>{item.Unit}</td><td className="num">{money(item.UnitPrice)}</td><td className="num">{money(item.AssAmt)}</td><td className="num">{item.GstRt}%</td><td className="num">{money(item.IgstAmt + item.CgstAmt + item.SgstAmt)}</td><td className="num">{money(item.TotItemVal)}</td></tr>)}</tbody>{values ? <tfoot><tr><td colSpan="6">Invoice totals</td><td className="num">{money(values.AssVal)}</td><td /><td className="num">{money(values.IgstVal + values.CgstVal + values.SgstVal)}</td><td className="num">{money(values.TotInvVal)}</td></tr></tfoot> : null}</table></div>
+      <div className="einvoice-item-scroll">
+        <table className="einvoice-item-table">
+          <thead><tr><th>Sl</th><th>Description</th><th>HSN</th><th>Qty</th>{showFreeQty ? <th>Free Qty</th> : null}<th>Unit</th><th>Rate</th><th>Taxable</th><th>GST</th><th>Tax</th><th>Total</th></tr></thead>
+          <tbody>{items.map((item) => <tr key={item.SlNo}><td>{item.SlNo}</td><td>{item.PrdDesc}</td><td>{item.HsnCd}</td><td className="num">{item.Qty}</td>{showFreeQty ? <td className="num">{item.FreeQty}</td> : null}<td>{item.Unit}</td><td className="num">{money(item.UnitPrice)}</td><td className="num">{money(item.AssAmt)}</td><td className="num">{item.GstRt}%</td><td className="num">{money(item.IgstAmt + item.CgstAmt + item.SgstAmt)}</td><td className="num">{money(item.TotItemVal)}</td></tr>)}</tbody>
+          {values ? <tfoot><tr><td colSpan={showFreeQty ? 7 : 6}>Invoice totals</td><td className="num">{money(values.AssVal)}</td><td /><td className="num">{money(values.IgstVal + values.CgstVal + values.SgstVal)}</td><td className="num">{money(values.TotInvVal)}</td></tr></tfoot> : null}
+        </table>
+      </div>
     </Section>
   );
 }

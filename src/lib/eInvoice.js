@@ -35,8 +35,8 @@ const STATE_NAMES = Object.freeze({
 
 const TRANSPORT_MODES = new Set(['1', '2', '3', '4']);
 const JSON_OUTPUT_OPTIONS = Object.freeze({
-  includeDispatchDetails: false,
-  includeFreeQuantity: false,
+  includeDispatchDetails: true,
+  includeFreeQuantity: true,
 });
 
 export async function getEInvoiceScreenData({ invoiceNo = '', search = '' } = {}) {
@@ -131,6 +131,9 @@ export function createEInvoiceDraft(invoice) {
       VehType: 'R',
       TransMode: '1',
     },
+    outputOptions: {
+      includeFreeQuantity: JSON_OUTPUT_OPTIONS.includeFreeQuantity,
+    },
     sourceSummary: {
       lineCount: lines.length,
       totalQty: roundQuantity(lines.reduce((sum, line) => sum + number(line.Qty), 0)),
@@ -191,7 +194,8 @@ function buildDocument(invoice, draft) {
   const withoutPayment = WITHOUT_PAYMENT_TYPES.has(supTyp);
   const useIgst = WITH_PAYMENT_TYPES.has(supTyp)
     || (!withoutPayment && (seller.Stcd !== clean(draft.buyer.Pos) || clean(draft.tran.IgstOnIntra).toUpperCase() === 'Y'));
-  const itemList = invoice.lines.map((line, index) => buildItem(line, index, gstRate, useIgst, withoutPayment));
+  const includeFreeQuantity = draft.outputOptions?.includeFreeQuantity !== false;
+  const itemList = invoice.lines.map((line, index) => buildItem(line, index, gstRate, useIgst, withoutPayment, includeFreeQuantity));
   const assVal = sumMoney(itemList, 'AssAmt');
   const igstVal = sumMoney(itemList, 'IgstAmt');
   const cgstVal = sumMoney(itemList, 'CgstAmt');
@@ -294,7 +298,7 @@ function buildDocument(invoice, draft) {
   return document;
 }
 
-function buildItem(line, index, gstRate, useIgst, withoutPayment) {
+function buildItem(line, index, gstRate, useIgst, withoutPayment, includeFreeQuantity) {
   const qty = roundQuantity(line.Qty);
   const unitPrice = roundMoney(line.Rate);
   const totalAmount = roundMoney(number(line.Amount) || qty * unitPrice);
@@ -309,7 +313,7 @@ function buildItem(line, index, gstRate, useIgst, withoutPayment) {
     IsServc: 'N',
     HsnCd: clean(line.HSNCode).replace(/\D/g, ''),
     Qty: qty,
-    ...(JSON_OUTPUT_OPTIONS.includeFreeQuantity ? { FreeQty: 0 } : {}),
+    ...(includeFreeQuantity ? { FreeQty: 0 } : {}),
     Unit: unitCode(line.Size),
     UnitPrice: unitPrice,
     TotAmt: totalAmount,
@@ -455,6 +459,7 @@ function mergeDraft(base, overrides) {
     shipping: mergeSection(base.shipping, safe.shipping),
     exportDetails: mergeSection(base.exportDetails, safe.exportDetails),
     ewayBill: mergeSection(base.ewayBill, safe.ewayBill),
+    outputOptions: mergeSection(base.outputOptions, safe.outputOptions),
     sourceSummary: base.sourceSummary,
     invoiceNo: base.invoiceNo,
     irn: base.irn,

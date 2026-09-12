@@ -172,6 +172,10 @@
 .einvoice-toggle-row { display: flex; flex-wrap: wrap; gap: 22px; padding: 2px 0; }
 .einvoice-toggle { display: inline-flex; align-items: center; gap: 10px; min-height: 30px; color: #3f3f46; font-size: 13px; font-weight: 700; }
 .einvoice-toggle input { width: 18px; height: 18px; accent-color: #5276d7; }
+.einvoice-output-option { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 22px; padding: 16px 18px; border: 1px solid #dfe5ef; border-radius: 10px; background: #f8faff; }
+.einvoice-output-option strong { display: block; color: #293750; font-size: 13px; }
+.einvoice-output-option p { margin: 4px 0 0; color: #667085; font-size: 11px; line-height: 1.45; }
+.einvoice-output-option .einvoice-toggle { flex: 0 0 auto; padding: 8px 12px; border: 1px solid #ccd8f2; border-radius: 8px; color: #3f61b9; background: #fff; }
 .einvoice-validation-panel { margin-top: 20px; padding: 21px 22px; }
 .einvoice-validation-panel.neutral { border-style: dashed; color: #616875; background: #fafafa; }
 .einvoice-validation-panel.success { border-color: #bfe4d1; background: #f2fbf6; }
@@ -224,6 +228,7 @@
   .einvoice-actionbar { padding-inline: 18px; }
   .einvoice-section > header,
   .einvoice-section-body { padding-inline: 18px; }
+  .einvoice-output-option { align-items: flex-start; flex-direction: column; gap: 12px; }
 }
 
 * {
