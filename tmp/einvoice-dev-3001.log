@@ -1,0 +1,21 @@
+
+> teakwood-po-invoice-web@0.1.0 dev
+> node ./node_modules/next/dist/bin/next dev -p 3001
+
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.1.34:3001
+- Environments: .env.local
+✓ Ready in 1851ms
+
+ GET /login?next=%2Fe-invoice%3FinvoiceNo%3DINS%252F26-27%252F944 200 in 895ms (next.js: 220ms, application-code: 675ms)
+ POST /api/e-invoice/prepare 200 in 3.5s (next.js: 3.1s, proxy.ts: 12ms, application-code: 320ms)
+ GET /login?next=%2Fe-invoice%3FinvoiceNo%3DINS%252F26-27%252F944 200 in 424ms (next.js: 219ms, application-code: 205ms)
+ POST /api/e-invoice/prepare 200 in 321ms (next.js: 82ms, proxy.ts: 106ms, application-code: 133ms)
+ POST /api/e-invoice/prepare 200 in 257ms (next.js: 33ms, proxy.ts: 46ms, application-code: 179ms)
+ POST /api/e-invoice/prepare 200 in 267ms (next.js: 80ms, proxy.ts: 41ms, application-code: 146ms)
+ POST /api/e-invoice/prepare 200 in 337ms (next.js: 65ms, proxy.ts: 40ms, application-code: 232ms)
+ POST /api/e-invoice/prepare 200 in 1388ms (next.js: 48ms, proxy.ts: 44ms, application-code: 1297ms)
+○ Compiling /e-invoice ...
+ GET /e-invoice?invoiceNo=INS%2F26-27%2F944 200 in 6.1s (next.js: 5.2s, proxy.ts: 8ms, application-code: 896ms)
+[?25h

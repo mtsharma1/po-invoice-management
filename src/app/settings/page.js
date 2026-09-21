@@ -2,6 +2,8 @@ import AppShell from '@/components/AppShell';
 import { DataError } from '@/components/DataState';
 import PageHeader from '@/components/PageHeader';
 import SettingsWorkbench from '@/components/SettingsWorkbench';
+import WhitebooksSettings from '@/components/WhitebooksSettings';
+import { getWhitebooksConfigurationStatus } from '@/lib/whitebooks';
 import { safeData } from '@/lib/safeData';
 import { getSettingsScreenData } from '@/lib/settings';
 import { getCurrentSession } from '@/lib/auth';
@@ -27,6 +29,7 @@ export default async function SettingsPage({ searchParams }) {
     <AppShell>
       {/* <PageHeader eyebrow="ADMINISTRATOR" title="SETTINGS" /> */}
       <DataError error={error} />
+      <WhitebooksSettings configured={getWhitebooksConfigurationStatus().configured} />
       <SettingsWorkbench
         data={data}
         feedback={{

@@ -25,6 +25,7 @@ export async function listInvoices(limit = 100) {
        h.InvoiceID,
        h.InvoiceNo,
        h.InvoiceDate,
+       h.IRN,
        h.GSTN,
        h.POBarcode,
        h.OrderNumber,
