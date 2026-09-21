@@ -5,6 +5,7 @@ import { cloneElement, useEffect, useMemo, useState, useTransition } from 'react
 import { useRouter } from 'next/navigation';
 import ActionIcon from './ActionIcon';
 import WhitebooksIrnAction from './WhitebooksIrnAction';
+import WhitebooksEwayBillAction from './WhitebooksEwayBillAction';
 
 const supplyTypes = [
   ['B2B', 'B2B — Business to business'],
@@ -87,6 +88,13 @@ const partyErrorFields = {
 export default function EInvoiceWorkbench({ rows, initialDraft, initialValidation, selectedInvoiceNo, search }) {
   const router = useRouter();
   const [draft, setDraft] = useState(initialDraft);
+  const [activeView, setActiveView] = useState('invoice');
+
+  function selectValidationError(entry) {
+    const key = errorFieldKeys(entry)[0] || '';
+    setActiveView(key.startsWith('ewayBill.') ? 'transport' : 'invoice');
+    requestAnimationFrame(() => requestAnimationFrame(() => focusValidationError(entry)));
+  }
   const [validation, setValidation] = useState(initialValidation);
   const [message, setMessage] = useState('');
   const [isPending, startTransition] = useTransition();
@@ -137,7 +145,7 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
   }
 
   function selectInvoice(invoiceNo) {
-    router.push(`/e-invoice?invoiceNo=${encodeURIComponent(invoiceNo)}`);
+    router.push(`/e-invoice?invoiceNo=${encodeURIComponent(invoiceNo)}${search ? `&search=${encodeURIComponent(search)}` : ''}`);
   }
 
   async function runPreparation(download) {
@@ -159,7 +167,7 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
           setMessage('Validation failed. Correct the listed fields before preparing JSON.');
           const firstEditableError = result.errors.find((entry) => errorFieldKeys(entry).length);
           if (firstEditableError) {
-            requestAnimationFrame(() => requestAnimationFrame(() => focusValidationError(firstEditableError)));
+            selectValidationError(firstEditableError);
           }
           return;
         }
@@ -184,10 +192,10 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
   }
 
   return (
-    <section className="einvoice-workspace">
-      <aside className="einvoice-list-panel">
+    <section className="einvoice-workspace einvoice-sequential">
+      {!selectedInvoiceNo ? <aside className="einvoice-list-panel">
         <div className="einvoice-list-heading">
-          <div><p>Invoice source</p><h2>Select invoice</h2></div>
+          <div><p>E-invoices</p><h2>Invoices</h2><div className="einvoice-list-intro">Choose an invoice to review details, prepare JSON, or generate an IRN and e-way bill.</div></div>
           <span>{rows.length}</span>
         </div>
         <form className="einvoice-search" method="get">
@@ -197,28 +205,29 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
         </form>
         <div className="einvoice-list-scroll">
           <table>
-            <thead><tr><th>Invoice</th><th>Date</th><th>Qty</th><th>IRN</th></tr></thead>
+            <thead><tr><th>Invoice</th><th>Date</th><th>Items</th><th>IRN status</th></tr></thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.InvoiceID} className={row.InvoiceNo === selectedInvoiceNo ? 'active' : ''} onClick={() => selectInvoice(row.InvoiceNo)}>
-                  <td><strong>{row.InvoiceNo}</strong><small>{row.ConsigneeName || row.DeliveredToName || 'Consignee in address'}</small></td>
+                  <td><Link className="einvoice-open-link" href={`/e-invoice?invoiceNo=${encodeURIComponent(row.InvoiceNo)}${search ? `&search=${encodeURIComponent(search)}` : ''}`} onClick={event => event.stopPropagation()}>{row.InvoiceNo}</Link><small>{row.ConsigneeName || row.DeliveredToName || 'Consignee in address'}</small></td>
                   <td>{shortDate(row.InvoiceDate)}</td>
                   <td>{row.lineCount}</td>
-                  <td><span className={`einvoice-irn-dot ${clean(row.IRN) ? 'ready' : ''}`} title={clean(row.IRN) ? 'IRN generated' : 'IRN not generated'} /></td>
+                  <td><span className={`einvoice-irn-dot ${clean(row.IRN) ? 'ready' : ''}`} title={clean(row.IRN) ? 'IRN generated' : 'IRN not generated'} /><span className="einvoice-list-status">{clean(row.IRN) ? 'Generated' : 'Not generated'}</span></td>
                 </tr>
               ))}
               {!rows.length ? <tr><td colSpan="4" className="einvoice-empty-row">No invoice found.</td></tr> : null}
             </tbody>
           </table>
         </div>
-      </aside>
+      </aside> : null}
 
-      <div className="einvoice-main">
+      {selectedInvoiceNo ? <div className="einvoice-main">
+        <Link className="einvoice-back-link" href={search ? `/e-invoice?search=${encodeURIComponent(search)}` : '/e-invoice'}>← Back to invoices</Link>
         {!draft ? (
           <div className="einvoice-empty">
             <span aria-hidden="true">{'{}'}</span>
-            <h2>Select an invoice to begin</h2>
-            <p>The page will map database values, validate the complete document and prepare portal-ready JSON.</p>
+            <h2>Invoice unavailable</h2>
+            <p>Return to the invoice list and select another invoice.</p>
           </div>
         ) : (
           <>
@@ -235,7 +244,7 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
                 </div>
               </div>
 
-              <div className="einvoice-actionbar">
+              <div className="einvoice-actionbar" hidden={activeView !== 'invoice'}>
                 <button type="button" className="einvoice-validate" onClick={() => runPreparation(false)} disabled={isPending}>
                   <ActionIcon name="refresh" /> {isPending ? 'Working…' : 'Validate'}
                 </button>
@@ -247,8 +256,14 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
               </div>
             </div>
 
-            <WhitebooksIrnAction key={draft.invoiceNo} draft={draft} validation={validation} disabled={isPending} onValidation={setValidation} />
-
+            <nav className="einvoice-view-nav" aria-label="Invoice workspace views">
+              {[['invoice', 'E-Invoice', 'Invoice details, review & generate IRN'], ['transport', 'E-way Bill', 'Transport details & generate e-way bill']].map(([view, label, hint]) => (
+                <button key={view} type="button" aria-current={activeView === view ? 'page' : undefined} onClick={() => setActiveView(view)}>
+                  <strong>{label}</strong><span>{hint}</span>
+                </button>
+              ))}
+            </nav>
+            <div className="einvoice-view-panel" hidden={activeView !== 'invoice'}>
             <Section title="Transaction & document" subtitle="Choose the IRP scenario; database identifiers remain linked to the selected invoice.">
               <div className="einvoice-form-grid cols-4">
                 <Field label="Supply type" fieldKey="tran.SupTyp" errors={errorsFor('tran.SupTyp')}><select value={draft.tran.SupTyp} onChange={(event) => updateSupply(event.target.value)}>{supplyTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
@@ -285,12 +300,14 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
               </div>
               <div className="einvoice-party-grid compact">
                 {draft.dispatch.enabled ? <PartyEditor title="Dispatch From" section="dispatch" party={draft.dispatch} update={update} errorsFor={errorsFor} hideContact hideGstin /> : null}
+
                 {draft.shipping.enabled ? <PartyEditor title="Ship To" section="shipping" party={draft.shipping} update={update} errorsFor={errorsFor} hideContact /> : null}
               </div>
             </Section>
 
             <Section title="Export / SEZ details" subtitle="Available for export and special economic zone documents.">
               <div className="einvoice-toggle-row"><Toggle checked={draft.exportDetails.enabled} onChange={(checked) => update('exportDetails', 'enabled', checked)} label="Include export details" /></div>
+
               {draft.exportDetails.enabled ? (
                 <div className="einvoice-form-grid cols-4">
                   <Field label="Shipping bill no"><input value={draft.exportDetails.ShipBNo} onChange={(event) => update('exportDetails', 'ShipBNo', event.target.value)} /></Field>
@@ -304,10 +321,17 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
               ) : null}
             </Section>
 
-            <Section title="E-Way Bill details" subtitle="Enable this section when e-way-bill data should be included in the same JSON.">
-              <div className="einvoice-toggle-row"><Toggle checked={draft.ewayBill.enabled} onChange={(checked) => update('ewayBill', 'enabled', checked)} label="Include e-way-bill details" /></div>
-              {draft.ewayBill.enabled ? (
-                <div className="einvoice-form-grid cols-4">
+
+
+            <div className="einvoice-output-option"><div><strong>Generate e-way bill with IRN</strong><p>Uses transport details entered in the E-way Bill category.</p></div><Toggle checked={draft.ewayBill.enabled} onChange={(checked) => update('ewayBill', 'enabled', checked)} label="Include transport in invoice JSON" /></div>
+            <WhitebooksIrnAction key={draft.invoiceNo} draft={draft} validation={validation} disabled={isPending} onValidation={setValidation} />
+            <ValidationPanel validation={validation} onSelectError={selectValidationError} />
+            <ItemsPanel items={validation?.items || initialValidation?.items || []} values={validation?.values || initialValidation?.values} />
+            </div>
+            <div className="einvoice-view-panel" hidden={activeView !== 'transport'}>
+            <Section title="Transport details" subtitle="Enter transport and vehicle details for standalone generation. Invoice and item details come from the E-Invoice category.">
+
+              <div className="einvoice-form-grid cols-4">
                   <Field label="Transporter ID" fieldKey="ewayBill.TransId" errors={errorsFor('ewayBill.TransId')}><input value={draft.ewayBill.TransId} onChange={(event) => update('ewayBill', 'TransId', event.target.value.toUpperCase())} /></Field>
                   <Field label="Transporter name" fieldKey="ewayBill.TransName" errors={errorsFor('ewayBill.TransName')}><input value={draft.ewayBill.TransName} onChange={(event) => update('ewayBill', 'TransName', event.target.value)} /></Field>
                   <Field label="Distance (km)" fieldKey="ewayBill.Distance" errors={errorsFor('ewayBill.Distance')}><input type="number" min="0" max="4000" value={draft.ewayBill.Distance} onChange={(event) => update('ewayBill', 'Distance', event.target.value)} /></Field>
@@ -317,14 +341,13 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
                   <Field label="Vehicle number" fieldKey="ewayBill.VehNo" errors={errorsFor('ewayBill.VehNo')}><input value={draft.ewayBill.VehNo} onChange={(event) => update('ewayBill', 'VehNo', event.target.value.toUpperCase())} /></Field>
                   <Field label="Vehicle type" fieldKey="ewayBill.VehType" errors={errorsFor('ewayBill.VehType')}><select value={draft.ewayBill.VehType} onChange={(event) => update('ewayBill', 'VehType', event.target.value)}><option value="R">Regular</option><option value="O">Over-dimensional cargo</option></select></Field>
                 </div>
-              ) : null}
             </Section>
+            <WhitebooksEwayBillAction key={`ewaybill-${draft.invoiceNo}`} invoiceNo={draft.invoiceNo} transport={draft.ewayBill} draft={draft} onValidation={setValidation} />
+            </div>
 
-            <ValidationPanel validation={validation} onSelectError={focusValidationError} />
-            <ItemsPanel items={validation?.items || initialValidation?.items || []} values={validation?.values || initialValidation?.values} />
           </>
         )}
-      </div>
+      </div> : null}
     </section>
   );
 }

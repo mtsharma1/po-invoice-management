@@ -103,3 +103,11 @@ connecting. The callback exchanges the one-time authorization code for a refresh
 token and stores that token AES-256-GCM encrypted in `webIntegrations`, using
 `APP_SESSION_SECRET` as the encryption-key source. Changing `APP_SESSION_SECRET`
 after connecting requires reconnecting Dropbox.
+
+## Separate sandbox e-way bills
+
+Use **Generate sandbox e-way bill** in the e-invoice workbench after saving a sandbox IRN. Enter transport details in its separate panel. The server gets a fresh auth token and IRP identifier, then calls GENERATE_EWAYBILL. WHITEBOOKS_IRP is an optional fallback when authentication omits the IRP. Results are saved in webWhitebooksSandboxEwayBill.ResultJson and reload on returning to the invoice. Production invoice fields are unchanged. Existing e-way bills returned during IRN generation are also recognized. Pending/uncertain requests require reconciliation in WhiteBooks before resubmission. Optional export shipping and dispatch address overrides are not exposed by this initial form.
+
+
+### Standalone e-way bill update
+The separate button now authenticates at `/ewaybillapi/v1.03/authenticate` and posts invoice data to `/ewaybillapi/v1.03/ewayapi/genewaybill`, using the supplied WhiteBooks wrapper headers. Set `WHITEBOOKS_IRP` to the account's IRP identifier; unlike the IRN authentication flow, it is needed before this authentication request. Full outward domestic B2B sales invoices are supported; Part-A-only, exports, inward movements and service items are not supported by this mapping yet. Invoice preparation validation is reused and can be stricter than the standalone NIC schema. No saved IRN is required. Existing combined/IRN-based results remain readable to prevent duplicate generation. New results use `webWhitebooksStandaloneEwayBill`; production invoice fields are unchanged. NIC can require e-invoice-enabled suppliers to use IRN-based generation for B2B invoices. Use combined IRN generation for that case.

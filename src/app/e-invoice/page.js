@@ -19,9 +19,10 @@ export default async function EInvoicePage({ searchParams }) {
 
   return (
     <AppShell>
-      <PageHeader eyebrow="GST / IRP" title="E-Invoice JSON" />
+      <PageHeader eyebrow="GST / IRP" title={invoiceNo ? "E-Invoice details" : "E-Invoices"} />
       <DataError error={error} />
       <EInvoiceWorkbench
+        key={invoiceNo || 'invoice-list'}
         rows={data.rows}
         initialDraft={data.draft}
         initialValidation={data.validation}

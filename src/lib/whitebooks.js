@@ -90,5 +90,80 @@ export async function authenticateWhitebooks() {
   }
 
   // Keep this result on the server for subsequent e-invoice API calls.
-  return { authToken: token };
+  return { authToken: token, ...(typeof payload.irp === 'string' ? { irp: payload.irp } : {}) };
+}
+
+
+export async function generateWhitebooksEwayBill(document, { authToken, irp }) {
+  if (!irp) throw new WhitebooksError('WhiteBooks authentication did not identify the IRP. Configure WHITEBOOKS_IRP for this sandbox account.');
+  const url = new URL('https://apisandbox.whitebooks.in/einvoice/type/GENERATE_EWAYBILL/version/V1_03');
+  url.searchParams.set('email', process.env.WHITEBOOKS_EMAIL.trim());
+  url.searchParams.set('irp', irp);
+  const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'username', 'gstin'].map(field => [field, process.env[FIELDS[field]]]));
+  let payload;
+  try {
+    const response = await fetch(url, {
+      method: 'POST', headers: { ...headers, 'auth-token': authToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify(document), cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30000),
+    });
+    if (!response.ok) throw new Error('Upstream failure');
+    payload = await response.json();
+  } catch {
+    throw new WhitebooksError('E-way bill outcome is uncertain. Check WhiteBooks before another submission.');
+  }
+  const data = payload?.data;
+  if (!['1', 'success', 'sucess'].includes(String(payload?.status_cd).toLowerCase()) || !/^\d{12}$/.test(String(data?.EwbNo || ''))) {
+    throw new WhitebooksError('WhiteBooks did not confirm an e-way bill. Check the submission in WhiteBooks before trying again.');
+  }
+  return Object.fromEntries(['EwbNo', 'EwbDt', 'EwbValidTill'].filter(key => ['string', 'number'].includes(typeof data[key])).map(key => [key, data[key]]));
+}
+
+
+// Standalone EWB authentication. Do not pair this token with IRP/e-invoice endpoints.
+export async function authenticateWhitebooksEwayBill() {
+  const config = Object.fromEntries(Object.entries(FIELDS).map(([field, key]) => [field, process.env[key]]));
+  const irp = process.env.WHITEBOOKS_IRP?.trim();
+  if (Object.values(config).some(value => !value?.trim()) || !irp) {
+    throw new WhitebooksError('Configure WhiteBooks credentials and WHITEBOOKS_IRP before standalone e-way bill authentication.');
+  }
+  const url = new URL('https://apisandbox.whitebooks.in/ewaybillapi/v1.03/authenticate');
+  for (const [key, value] of Object.entries({ email: config.email, username: config.username, password: config.password, irp })) url.searchParams.set(key, value);
+  const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'gstin'].map(key => [key, config[key]]));
+  let payload;
+  try {
+    const response = await fetch(url, { method: 'GET', headers, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000) });
+    if (!response.ok) throw new Error('Authentication rejected');
+    payload = await response.json();
+  } catch {
+    // The query contains a password: never return or log the URL or fetch error.
+    throw new WhitebooksError('Standalone e-way bill authentication failed or returned an invalid response.');
+  }
+  const token = payload?.data?.authtoken ?? payload?.data?.AuthToken ?? payload?.authtoken;
+  const status = String(payload?.status_cd ?? payload?.status ?? '').toLowerCase();
+  if (!['1', 'success', 'sucess'].includes(status) || typeof token !== 'string' || !token.trim()) {
+    throw new WhitebooksError('WhiteBooks did not return a valid standalone e-way bill token. Check the e-way bill API credentials.');
+  }
+  return { authToken: token, irp };
+}
+
+
+export async function generateStandaloneWhitebooksEwayBill(document, { irp }) {
+  const url = new URL('https://apisandbox.whitebooks.in/ewaybillapi/v1.03/ewayapi/genewaybill');
+  url.searchParams.set('email', process.env.WHITEBOOKS_EMAIL.trim());
+  url.searchParams.set('irp', irp);
+  const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'gstin'].map(key => [key, process.env[FIELDS[key]]]));
+  let payload;
+  try {
+    // WhiteBooks' supplied wrapper uses the authenticated session, with no token header.
+    const response = await fetch(url, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(document), cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30000) });
+    if (!response.ok) throw new Error('Upstream failure');
+    payload = await response.json();
+  } catch {
+    throw new WhitebooksError('Standalone e-way bill outcome is uncertain. Check WhiteBooks before resubmitting.');
+  }
+  const data = payload?.data;
+  if (!['1', 'success', 'sucess'].includes(String(payload?.status_cd ?? payload?.status).toLowerCase()) || !/^\d{12}$/.test(String(data?.ewayBillNo || ''))) {
+    throw new WhitebooksError('WhiteBooks did not confirm a standalone e-way bill. Check the submission in WhiteBooks before resubmitting.');
+  }
+  return { EwbNo: data.ewayBillNo, EwbDt: typeof data.ewayBillDate === 'string' ? data.ewayBillDate : '', EwbValidTill: typeof data.validUpto === 'string' ? data.validUpto : '' };
 }

@@ -6738,3 +6738,88 @@ table thead th,
   .master-image-editor-heading { align-items: flex-start; flex-direction: column; }
   .master-image-editor-heading button { width: 100%; }
 }
+
+/* Focused invoice workspace: shared transport form and persistent view state. */
+.einvoice-view-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 6px; border: 1px solid #dfe5ef; border-radius: 14px; background: #f1f4f9; }
+.einvoice-view-nav button { text-align: left; padding: 14px 16px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #52627b; cursor: pointer; }
+.einvoice-view-nav button strong, .einvoice-view-nav button span { display: block; }
+.einvoice-view-nav button strong { font-size: 14px; }
+.einvoice-view-nav button span { font-size: 12px; margin-top: 5px; }
+.einvoice-view-nav button[aria-current="page"] { background: white; color: #244fbd; border-color: #d4def5; box-shadow: 0 2px 6px #263f6710; }
+.einvoice-view-nav button:focus-visible { outline: 3px solid #7899ef; outline-offset: 2px; }
+.einvoice-view-panel { display: grid; gap: 18px; min-width: 0; }
+.einvoice-view-panel[hidden] { display: none; }
+.einvoice-view-panel .einvoice-section > header { padding-top: 18px; padding-bottom: 18px; }
+@media (max-width: 700px) {
+  .einvoice-view-nav { gap: 3px; }
+  .einvoice-view-nav button { padding: 12px 8px; }
+  .einvoice-view-nav button span { display: none; }
+}
+
+/* Invoice list first, then a full-width detail workspace. */
+.einvoice-workspace.einvoice-sequential { grid-template-columns: minmax(0, 1fr); }
+.einvoice-sequential .einvoice-list-panel { position: static; }
+.einvoice-sequential .einvoice-list-scroll { max-height: none; overflow-x: auto; }
+.einvoice-sequential .einvoice-list-scroll table { min-width: 560px; font-size: 14px; }
+.einvoice-sequential .einvoice-list-scroll th { font-size: 11px; padding: 16px; }
+.einvoice-sequential .einvoice-list-scroll td { padding: 18px 16px; }
+.einvoice-sequential .einvoice-list-scroll th:nth-child(1) { width: 44%; }
+.einvoice-sequential .einvoice-list-scroll th:nth-child(2) { width: 22%; }
+.einvoice-sequential .einvoice-list-scroll th:nth-child(3) { width: 10%; }
+.einvoice-sequential .einvoice-list-scroll th:nth-child(4) { width: 24%; }
+.einvoice-sequential .einvoice-list-scroll td small { max-width: none; font-size: 12px; white-space: normal; }
+.einvoice-sequential .einvoice-search { display: flex; align-items: center; gap: 12px; }
+.einvoice-sequential .einvoice-search input { flex: 1; max-width: 520px; min-width: 0; }
+.einvoice-list-intro { color: #69778d; font-size: 14px; margin-top: 10px; line-height: 1.5; }
+.einvoice-open-link { color: #3156b4; font-weight: 650; text-decoration: none; }
+.einvoice-open-link:hover { text-decoration: underline; }
+.einvoice-list-status { margin-left: 8px; font-size: 12px; }
+.einvoice-back-link { justify-self: start; display: inline-flex; padding: 10px 0; color: #3156b4; font-weight: 600; text-decoration: none; }
+.einvoice-back-link:hover { text-decoration: underline; }
+@media (max-width: 600px) { .einvoice-sequential .einvoice-search { flex-wrap: wrap; } }
+
+.einvoice-view-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.einvoice-actionbar[hidden] { display: none; }
+
+/* Consistent compact spacing for invoice detail controls and sections. */
+.einvoice-sequential .einvoice-main { display: grid; gap: 14px; }
+.einvoice-sequential .einvoice-view-panel { gap: 14px; }
+.einvoice-sequential .einvoice-view-panel > .einvoice-section,
+.einvoice-sequential .einvoice-view-panel > .einvoice-party-grid,
+.einvoice-sequential .einvoice-view-panel > .einvoice-validation-panel,
+.einvoice-sequential .einvoice-view-panel > .einvoice-output-option { margin-top: 0; }
+.einvoice-sequential .einvoice-hero { min-height: 0; padding: 16px 20px; }
+.einvoice-sequential .einvoice-actionbar { gap: 8px; padding: 10px 18px; }
+.einvoice-sequential .einvoice-actionbar[hidden] { display: none; }
+.einvoice-sequential .einvoice-view-nav { padding: 5px; gap: 6px; }
+.einvoice-sequential .einvoice-view-nav button { padding: 10px 14px; }
+.einvoice-sequential .einvoice-view-nav button span { margin-top: 3px; }
+.einvoice-sequential .einvoice-section > header,
+.einvoice-sequential .einvoice-party-card > header { padding: 12px 16px; }
+.einvoice-sequential .einvoice-party-card > header { min-height: 70px; box-sizing: border-box; }
+.einvoice-sequential .einvoice-section-body,
+.einvoice-sequential .einvoice-party-card > .einvoice-form-grid { padding: 16px; }
+.einvoice-sequential .einvoice-form-grid { column-gap: 14px; row-gap: 12px; align-items: start; }
+.einvoice-sequential .einvoice-field { gap: 5px; margin: 0; }
+.einvoice-sequential .einvoice-field > span { line-height: 1.4; }
+.einvoice-sequential .einvoice-field input,
+.einvoice-sequential .einvoice-field select { height: 38px; padding: 0 10px; border-radius: 6px; box-sizing: border-box; }
+.einvoice-sequential .einvoice-actionbar button,
+.einvoice-sequential .einvoice-actionbar a,
+.einvoice-sequential .einvoice-section-body > button { min-height: 38px; padding: 8px 12px; border-radius: 6px; }
+.einvoice-sequential .einvoice-party-grid { gap: 14px; }
+.einvoice-sequential .einvoice-party-grid.compact { margin-top: 12px; }
+.einvoice-sequential .einvoice-toggle-row { gap: 14px; padding: 0; margin-bottom: 12px; }
+.einvoice-sequential .einvoice-output-option { margin-top: 14px; padding: 10px 14px; gap: 14px; }
+.einvoice-sequential .einvoice-output-option .einvoice-toggle { padding: 4px 8px; gap: 8px; }
+.einvoice-sequential .einvoice-validation-panel { padding: 16px; }
+.einvoice-sequential .einvoice-back-link { padding: 4px 0; }
+@media (max-width: 700px) {
+  .einvoice-sequential .einvoice-field input,
+  .einvoice-sequential .einvoice-field select { height: 44px; }
+  .einvoice-sequential .einvoice-actionbar button,
+  .einvoice-sequential .einvoice-actionbar a,
+  .einvoice-sequential .einvoice-section-body > button { min-height: 44px; }
+  .einvoice-sequential .einvoice-output-option { flex-wrap: wrap; }
+  .einvoice-sequential .einvoice-hero { flex-wrap: wrap; padding: 14px 16px; }
+}
