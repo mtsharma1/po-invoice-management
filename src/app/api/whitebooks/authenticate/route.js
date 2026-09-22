@@ -1,5 +1,5 @@
 import { getCurrentSession } from '@/lib/auth';
-import { authenticateWhitebooks, WhitebooksError } from '@/lib/whitebooks';
+import { authenticateWhitebooks, WhitebooksError, getEInvoiceEnvironment } from '@/lib/whitebooks';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -18,7 +18,7 @@ export async function POST(request) {
     }
 
     await authenticateWhitebooks();
-    return json({ ok: true, message: 'WhiteBooks sandbox authentication succeeded.' });
+    return json({ ok: true, message: `WhiteBooks ${getEInvoiceEnvironment()} authentication succeeded.` });
   } catch (error) {
     return json({
       ok: false,

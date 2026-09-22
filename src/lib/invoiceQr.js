@@ -1,8 +1,13 @@
+function cleanQrValue(value) {
+  const text = String(value ?? '').trim();
+  return ['null', 'undefined'].includes(text.toLowerCase()) ? '' : text;
+}
+
 function qrValue(headerOrValue) {
   if (typeof headerOrValue === 'object' && headerOrValue) {
-    return String(headerOrValue.IRN || headerOrValue.InvoiceNo || '').trim();
+    return cleanQrValue(headerOrValue.IRN) || cleanQrValue(headerOrValue.InvoiceNo);
   }
-  return String(headerOrValue || '').trim();
+  return cleanQrValue(headerOrValue);
 }
 
 const qrOptions = {

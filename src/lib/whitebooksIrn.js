@@ -34,7 +34,7 @@ export async function generateSandboxIrn(invoiceNo, draft) {
   if (existing?.state === 'succeeded') return { ok: true, ...existing };
   if (existing) throw new WhitebooksError('A previous submission is pending or uncertain. Reconcile it in WhiteBooks before another submission.');
 
-  const { authToken } = await authenticateWhitebooks();
+  const { authToken } = await authenticateWhitebooks('sandbox');
   const [, month, year] = document.DocDtls.Dt.split('/').map(Number);
   const financialYear = month >= 4 ? year : year - 1;
   const documentKey = createHash('sha256').update(JSON.stringify([
@@ -50,7 +50,7 @@ export async function generateSandboxIrn(invoiceNo, draft) {
   }
   let result;
   try {
-    result = await generateWhitebooksIrn(document, authToken);
+    result = await generateWhitebooksIrn(document, authToken, 'sandbox');
     await query('UPDATE webWhitebooksSandboxIrn SET State = ?, ResultJson = ? WHERE InvoiceNo = ?',
       ['succeeded', JSON.stringify(result), invoiceNo]);
   } catch (error) {

@@ -53,7 +53,7 @@ test('WhiteBooks authentication request and safe failure handling', async () => 
     }
     globalThis.fetch = async () => new Response('secret-provider-response', { status: 401 });
     globalThis.fetch = async () => Response.json({ status_cd: '0', status_desc: 'Incorrect user id/User does not exists' });
-    await assert.rejects(authenticateWhitebooks, /rejected the sandbox API username/);
+    await assert.rejects(authenticateWhitebooks, /rejected the API username/);
     globalThis.fetch = async () => new Response('secret-provider-response', { status: 401 });
     await assert.rejects(authenticateWhitebooks, /HTTP 401/);
     globalThis.fetch = async () => new Response('not-json');
@@ -62,7 +62,7 @@ test('WhiteBooks authentication request and safe failure handling', async () => 
     await assert.rejects(authenticateWhitebooks, /could not be reached/);
     delete process.env.WHITEBOOKS_PASSWORD;
     assert.equal(getWhitebooksConfigurationStatus().configured, false);
-    await assert.rejects(authenticateWhitebooks, /WHITEBOOKS_PASSWORD/);
+    await assert.rejects(authenticateWhitebooks, /password/);
   } finally {
     globalThis.fetch = originalFetch;
     for (const [key, value] of Object.entries(original)) {

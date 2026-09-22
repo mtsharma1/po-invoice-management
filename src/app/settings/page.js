@@ -29,7 +29,7 @@ export default async function SettingsPage({ searchParams }) {
     <AppShell>
       {/* <PageHeader eyebrow="ADMINISTRATOR" title="SETTINGS" /> */}
       <DataError error={error} />
-      <WhitebooksSettings configured={getWhitebooksConfigurationStatus().configured} />
+      <WhitebooksSettings {...getWhitebooksConfigurationStatus()} />
       <SettingsWorkbench
         data={data}
         feedback={{

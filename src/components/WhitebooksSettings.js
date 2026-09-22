@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export default function WhitebooksSettings({ configured = false }) {
+export default function WhitebooksSettings({ configured = false, environment = 'sandbox' }) {
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -26,9 +26,9 @@ export default function WhitebooksSettings({ configured = false }) {
       <div className="settings-dropbox-panel">
         <div className="settings-dropbox-copy">
           <div>
-            <p>E-invoice sandbox</p>
+            <p>E-invoice {environment}</p>
             <h3>WhiteBooks authentication</h3>
-            <span>Verify your sandbox credentials before using the e-invoice API.</span>
+            <span>Verify your {environment} credentials before using the e-invoice API.</span>
             {!configured ? <small>Add the WhiteBooks credentials to the server environment and restart the app.</small> : null}
           </div>
         </div>
