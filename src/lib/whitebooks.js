@@ -129,14 +129,30 @@ export async function generateWhitebooksEwayBill(document, { authToken, irp }) {
 }
 
 
+export function getEwayBillEnvironment() {
+  const value = process.env.WHITEBOOKS_EWAYBILL_ENV || 'sandbox';
+  if (!['sandbox', 'production'].includes(value)) throw new WhitebooksError('Invalid e-way bill environment.');
+  return value;
+}
+
+export function getEwayBillConfig(environment = getEwayBillEnvironment()) {
+  if (!['sandbox', 'production'].includes(environment)) throw new WhitebooksError('Invalid e-way bill environment.');
+  const prefix = environment === 'production' ? 'WHITEBOOKS_EWAYBILL_PRODUCTION_' : 'WHITEBOOKS_';
+  return {
+    environment,
+    baseUrl: environment === 'production' ? 'https://api.whitebooks.in' : 'https://apisandbox.whitebooks.in',
+    values: Object.fromEntries(Object.keys(FIELDS).map(field => [field, process.env[prefix + field.toUpperCase()]])),
+    irp: process.env[prefix + 'IRP']?.trim(),
+  };
+}
+
 // Standalone EWB authentication. Do not pair this token with IRP/e-invoice endpoints.
-export async function authenticateWhitebooksEwayBill() {
-  const config = Object.fromEntries(Object.entries(FIELDS).map(([field, key]) => [field, process.env[key]]));
-  const irp = process.env.WHITEBOOKS_IRP?.trim();
+export async function authenticateWhitebooksEwayBill(environment = getEwayBillEnvironment()) {
+  const { values: config, baseUrl, irp } = getEwayBillConfig(environment);
   if (Object.values(config).some(value => !value?.trim()) || !irp) {
-    throw new WhitebooksError('Configure WhiteBooks credentials and WHITEBOOKS_IRP before standalone e-way bill authentication.');
+    throw new WhitebooksError(`Configure all ${environment} e-way bill credentials and the IRP value before authentication.`);
   }
-  const url = new URL('https://apisandbox.whitebooks.in/ewaybillapi/v1.03/authenticate');
+  const url = new URL('/ewaybillapi/v1.03/authenticate', baseUrl);
   for (const [key, value] of Object.entries({ email: config.email, username: config.username, password: config.password, irp })) url.searchParams.set(key, value);
   const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'gstin'].map(key => [key, config[key]]));
   let payload;
@@ -157,11 +173,12 @@ export async function authenticateWhitebooksEwayBill() {
 }
 
 
-export async function generateStandaloneWhitebooksEwayBill(document, { irp }) {
-  const url = new URL('https://apisandbox.whitebooks.in/ewaybillapi/v1.03/ewayapi/genewaybill');
-  url.searchParams.set('email', process.env.WHITEBOOKS_EMAIL.trim());
+export async function generateStandaloneWhitebooksEwayBill(document, { irp }, environment = getEwayBillEnvironment()) {
+  const { baseUrl, values } = getEwayBillConfig(environment);
+  const url = new URL('/ewaybillapi/v1.03/ewayapi/genewaybill', baseUrl);
+  url.searchParams.set('email', values.email.trim());
   url.searchParams.set('irp', irp);
-  const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'gstin'].map(key => [key, process.env[FIELDS[key]]]));
+  const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'gstin'].map(key => [key, values[key]]));
   let payload;
   try {
     // WhiteBooks' supplied wrapper uses the authenticated session, with no token header.

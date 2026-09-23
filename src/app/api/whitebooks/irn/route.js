@@ -1,3 +1,4 @@
+import { isSameOriginRequest } from '@/lib/requestOrigin';
 import { getCurrentSession } from '@/lib/auth';
 import { canAccessFeature, FEATURES } from '@/lib/permissions';
 import { generateSandboxIrn, getSandboxIrn } from '@/lib/whitebooksIrn';
@@ -13,8 +14,8 @@ async function handle(request, generate) {
     if (!canAccessFeature(await getCurrentSession(), FEATURES.E_INVOICE)) {
       return json({ ok: false, error: 'E-invoice access is required.' }, 403);
     }
-    if (generate && request.headers.get('origin') !== new URL(request.url).origin) {
-      return json({ ok: false, error: 'A same-origin request is required.' }, 403);
+    if (generate && !isSameOriginRequest(request)) {
+      return json({ ok: false, error: 'Request origin does not match this app. Set APP_ORIGIN on the server to the exact browser origin (including port), then restart the app.' }, 403);
     }
     let payload;
     try { payload = generate ? await request.json() : { invoiceNo: new URL(request.url).searchParams.get('invoiceNo') }; }
