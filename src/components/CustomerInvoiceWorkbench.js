@@ -26,6 +26,11 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
     setListSearchText(search || '');
   }, [search]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setQrSrc(invoiceQrUrl(form)), 250);
+    return () => clearTimeout(timer);
+  }, [form.IRN, form.InvoiceNo, form.AckNo, form.AckDate]);
+
   const canPrint = useMemo(() => Boolean(form.InvoiceNo), [form.InvoiceNo]);
 
   function updateField(field, value) {

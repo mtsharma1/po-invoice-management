@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { prepareEInvoice } from './eInvoice';
 import { query } from './db';
+import { getProductionIrn } from './whitebooksProductionIrn';
 import { getSandboxIrn } from './whitebooksIrn';
-import { authenticateWhitebooksEwayBill, generateStandaloneWhitebooksEwayBill, WhitebooksError } from './whitebooks';
+import { authenticateWhitebooksEwayBill, generateStandaloneWhitebooksEwayBill, WhitebooksError, getEwayBillConfig, getEwayBillEnvironment } from './whitebooks';
 
 async function ensureTable() {
   await query(`CREATE TABLE IF NOT EXISTS webWhitebooksSandboxEwayBill (
@@ -49,8 +50,14 @@ export function prepareEwayBill(irn, input = {}) {
 }
 
 
-async function ensureStandaloneTable() {
-  await query(`CREATE TABLE IF NOT EXISTS webWhitebooksStandaloneEwayBill (
+function resultTable(environment) {
+  if (!['production', 'sandbox'].includes(environment)) throw new WhitebooksError('Invalid e-way bill environment.');
+  return environment === 'production' ? 'webWhitebooksProductionEwayBill' : 'webWhitebooksStandaloneEwayBill';
+}
+
+async function ensureStandaloneTable(environment) {
+  const table = resultTable(environment);
+  await query(`CREATE TABLE IF NOT EXISTS ${table} (
     InvoiceNo VARCHAR(255) NOT NULL PRIMARY KEY, DocumentKey CHAR(64) NOT NULL UNIQUE,
     State VARCHAR(20) NOT NULL, RequestJson LONGTEXT NOT NULL, ResultJson LONGTEXT NULL,
     CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -58,11 +65,14 @@ async function ensureStandaloneTable() {
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
 }
 
-export async function getSandboxEwayBill(invoiceNo) {
-  await ensureStandaloneTable();
-  const rows = await query('SELECT State, ResultJson FROM webWhitebooksStandaloneEwayBill WHERE InvoiceNo = ?', [invoiceNo]);
+export async function getEwayBill(invoiceNo, environment = getEwayBillEnvironment()) {
+  await ensureStandaloneTable(environment);
+  const table = resultTable(environment);
+  const rows = await query(`SELECT State, ResultJson FROM ${table} WHERE InvoiceNo = ?`, [invoiceNo]);
   if (rows.length) return { state: rows[0].State, result: rows[0].ResultJson ? JSON.parse(rows[0].ResultJson) : null };
-  return getLegacyEwayBill(invoiceNo);
+  if (environment === 'sandbox') return getLegacyEwayBill(invoiceNo);
+  const source = await getProductionIrn(invoiceNo);
+  return source?.result?.EwbNo ? { state: 'succeeded', result: source.result } : null;
 }
 
 export function buildStandaloneEwayBill(document, transport) {
@@ -98,29 +108,31 @@ export function buildStandaloneEwayBill(document, transport) {
   return body;
 }
 
-export async function generateSandboxEwayBill(invoiceNo, transport, draft) {
-  const existing = await getSandboxEwayBill(invoiceNo);
+export async function generateEwayBill(invoiceNo, transport, draft, environment = getEwayBillEnvironment()) {
+  const table = resultTable(environment);
+  const existing = await getEwayBill(invoiceNo, environment);
   if (existing?.state === 'succeeded') return { ok: true, ...existing };
   if (existing) throw new WhitebooksError('A previous e-way bill request is pending or uncertain. Reconcile it in WhiteBooks before resubmitting.');
   const prepared = await prepareEInvoice(invoiceNo, { ...draft, ewayBill: { ...transport, enabled: false } });
   if (!prepared.valid) return { ok: false, error: 'Correct invoice details before generating the e-way bill.', validation: prepared };
   const document = buildStandaloneEwayBill(prepared.document, transport);
-  if (document.fromGstin !== process.env.WHITEBOOKS_GSTIN?.trim()) throw new WhitebooksError('Supplier GSTIN must match the configured sandbox GSTIN.');
-  const auth = await authenticateWhitebooksEwayBill();
+  if (document.docNo !== invoiceNo) throw new WhitebooksError('Document number must match the selected invoice number.');
+  if (document.fromGstin !== getEwayBillConfig(environment).values.gstin?.trim()) throw new WhitebooksError('Supplier GSTIN must match the configured e-way bill GSTIN.');
+  const auth = await authenticateWhitebooksEwayBill(environment);
   const [, month, year] = document.docDate.split('/').map(Number);
   const key = createHash('sha256').update(JSON.stringify([document.fromGstin, month >= 4 ? year : year - 1, document.docType, document.docNo.toUpperCase()])).digest('hex');
   try {
-    await query('INSERT INTO webWhitebooksStandaloneEwayBill (InvoiceNo, DocumentKey, State, RequestJson) VALUES (?, ?, ?, ?)', [invoiceNo, key, 'pending', JSON.stringify(document)]);
+    await query(`INSERT INTO ${table} (InvoiceNo, DocumentKey, State, RequestJson) VALUES (?, ?, ?, ?)`, [invoiceNo, key, 'pending', JSON.stringify(document)]);
   } catch (error) {
     if (error.code === 'ER_DUP_ENTRY') throw new WhitebooksError('An e-way bill submission already exists. Refresh its status.');
     throw error;
   }
   let result;
   try {
-    result = await generateStandaloneWhitebooksEwayBill(document, auth);
-    await query('UPDATE webWhitebooksStandaloneEwayBill SET State = ?, ResultJson = ? WHERE InvoiceNo = ?', ['succeeded', JSON.stringify(result), invoiceNo]);
+    result = await generateStandaloneWhitebooksEwayBill(document, auth, environment);
+    await query(`UPDATE ${table} SET State = ?, ResultJson = ? WHERE InvoiceNo = ?`, ['succeeded', JSON.stringify(result), invoiceNo]);
   } catch (error) {
-    await query('UPDATE webWhitebooksStandaloneEwayBill SET State = ? WHERE InvoiceNo = ?', ['uncertain', invoiceNo]).catch(() => {});
+    await query(`UPDATE ${table} SET State = ? WHERE InvoiceNo = ?`, ['uncertain', invoiceNo]).catch(() => {});
     if (result) return { ok: true, state: 'uncertain', result, warning: 'E-way bill generated but saving failed. Download the result and reconcile in WhiteBooks.' };
     throw error;
   }

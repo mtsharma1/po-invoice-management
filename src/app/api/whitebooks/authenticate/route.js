@@ -1,5 +1,6 @@
+import { isSameOriginRequest } from '@/lib/requestOrigin';
 import { getCurrentSession } from '@/lib/auth';
-import { authenticateWhitebooks, WhitebooksError } from '@/lib/whitebooks';
+import { authenticateWhitebooks, WhitebooksError, getEInvoiceEnvironment } from '@/lib/whitebooks';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -13,12 +14,12 @@ export async function POST(request) {
     const session = await getCurrentSession();
     if (!session?.admin) return json({ ok: false, error: 'Administrator access is required.' }, 403);
 
-    if (request.headers.get('origin') !== new URL(request.url).origin) {
-      return json({ ok: false, error: 'A same-origin request is required.' }, 403);
+    if (!isSameOriginRequest(request)) {
+      return json({ ok: false, error: 'Request origin does not match this app. Set APP_ORIGIN on the server to the exact browser origin (including port), then restart the app.' }, 403);
     }
 
     await authenticateWhitebooks();
-    return json({ ok: true, message: 'WhiteBooks sandbox authentication succeeded.' });
+    return json({ ok: true, message: `WhiteBooks ${getEInvoiceEnvironment()} authentication succeeded.` });
   } catch (error) {
     return json({
       ok: false,

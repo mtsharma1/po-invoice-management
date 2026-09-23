@@ -324,7 +324,7 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
 
 
             <div className="einvoice-output-option"><div><strong>Generate e-way bill with IRN</strong><p>Uses transport details entered in the E-way Bill category.</p></div><Toggle checked={draft.ewayBill.enabled} onChange={(checked) => update('ewayBill', 'enabled', checked)} label="Include transport in invoice JSON" /></div>
-            <WhitebooksIrnAction key={draft.invoiceNo} draft={draft} validation={validation} disabled={isPending} onValidation={setValidation} />
+            <WhitebooksIrnAction key={draft.invoiceNo} draft={draft} validation={validation} disabled={isPending} onValidation={setValidation} onGenerated={result => { setDraft(current => ({ ...current, irn: result.Irn, acknowledgement: String(result.AckNo) })); router.refresh(); }} />
             <ValidationPanel validation={validation} onSelectError={selectValidationError} />
             <ItemsPanel items={validation?.items || initialValidation?.items || []} values={validation?.values || initialValidation?.values} />
             </div>
