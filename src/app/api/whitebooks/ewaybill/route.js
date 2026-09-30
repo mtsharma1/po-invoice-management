@@ -2,7 +2,7 @@ import { isSameOriginRequest } from '@/lib/requestOrigin';
 import { saveEwayBillTransport } from '@/lib/ewayBillTransport';
 import { getCurrentSession } from '@/lib/auth';
 import { canAccessFeature, FEATURES } from '@/lib/permissions';
-import { generateEwayBill, getEwayBill } from '@/lib/whitebooksEwayBill';
+import { generateEwayBill, getEwayBill, reconcileEwayBill } from '@/lib/whitebooksEwayBill';
 import { WhitebooksError, getEwayBillEnvironment } from '@/lib/whitebooks';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +22,12 @@ async function handle(request, generate) {
     catch { return json({ ok: false, error: 'Invalid JSON request.' }, 400); }
     const invoiceNo = typeof payload?.invoiceNo === 'string' ? payload.invoiceNo.trim() : '';
     if (!invoiceNo || invoiceNo.length > 255) return json({ ok: false, error: 'A valid invoice number is required.' }, 400);
+    if (request.method === 'POST' && ['reconcile', 'save-existing'].includes(payload.action)) {
+      const environment = getEwayBillEnvironment();
+      const confirmed = payload.action === 'save-existing' ? payload.confirmedEwbNo : null;
+      if (payload.action === 'save-existing' && (typeof confirmed !== 'string' || !/^\d{12}$/.test(confirmed))) return json({ ok: false, error: 'Confirm the displayed e-way bill number before saving.' }, 400);
+      return json({ ...await reconcileEwayBill(invoiceNo, environment, confirmed), environment });
+    }
     if (generate) {
       await saveEwayBillTransport(invoiceNo, payload.transport);
       if (request.method === 'PUT') return json({ ok: true });

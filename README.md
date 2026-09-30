@@ -123,3 +123,9 @@ Set `WHITEBOOKS_EWAYBILL_ENV=production` and configure all `WHITEBOOKS_PRODUCTIO
 Requests and results are saved in `webWhitebooksProductionEwayBill` by InvoiceNo. ResultJson contains EwbNo, EwbDt and EwbValidTill. Existing bills generated along with IRN are reused from `webWhitebooksProductionIrn`. Pending or uncertain submissions remain blocked for reconciliation, including provider timeouts and database save failures; no automatic generation retries occur. These tables need CREATE TABLE permission on first use. Standalone e-way bill credentials remain separate for the standalone API and are not used for production IRN-based generation.
 
 Run `node scripts/test-irn-ewaybill.mjs` for synthetic, mocked authentication, generation, saving, reload, conflict and uncertain-outcome coverage. Tests do not load database credentials or generate live e-way bills.
+
+### Existing e-way bill checkpoint
+
+Before generating a production e-way bill, the server reads the saved IRN associated with the selected invoice and checks WhiteBooks GETIRN. A confirmed existing bill is displayed for review without saving it. The user must choose **Yes, save to invoice** to persist it. This action rechecks the provider and compares the confirmed bill number; browser-supplied dates and results are never trusted. **No, do not save** leaves the stored bill details unchanged. Status checks use the same confirmation flow.
+
+Generation proceeds only when WhiteBooks returns the matching active IRN with an explicit null EwbNo. Failed, malformed or inconclusive lookups block generation. Existing pending or uncertain submissions retain their protection and can be checked with **Check WhiteBooks status**. This checkpoint uses the invoice's saved IRN; it does not implement standalone document-number lookup for invoices without an IRN.
