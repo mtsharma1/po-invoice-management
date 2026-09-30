@@ -329,7 +329,7 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
             <ItemsPanel items={validation?.items || initialValidation?.items || []} values={validation?.values || initialValidation?.values} />
             </div>
             <div className="einvoice-view-panel" hidden={activeView !== 'transport'}>
-            <Section title="Transport details" subtitle="Enter transport and vehicle details for standalone generation. Invoice and item details come from the E-Invoice category.">
+            <Section title="Transport details" subtitle="Enter transport and vehicle details. Production e-way bills use the invoice details registered with the saved IRN.">
 
               <div className="einvoice-form-grid cols-4">
                   <Field label="Transporter ID" fieldKey="ewayBill.TransId" errors={errorsFor('ewayBill.TransId')}><input value={draft.ewayBill.TransId} onChange={(event) => update('ewayBill', 'TransId', event.target.value.toUpperCase())} /></Field>

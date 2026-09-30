@@ -104,6 +104,31 @@ export async function authenticateWhitebooks(environment = getEInvoiceEnvironmen
 }
 
 
+export async function getWhitebooksEwayBillByIrn(irn, { authToken, irp }, environment = 'production', { allowMissing = false } = {}) {
+  const { baseUrl, values } = getEInvoiceConfig(environment);
+  const url = new URL('/einvoice/type/GETIRN/version/V1_03', baseUrl);
+  url.searchParams.set('param1', irn);
+  url.searchParams.set('email', values.email.trim());
+  if (irp) url.searchParams.set('irp', irp);
+  const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'username', 'gstin'].map(field => [field, values[field]]));
+  let payload;
+  try {
+    const response = await fetch(url, { method: 'GET', headers: { ...headers, 'auth-token': authToken }, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000) });
+    if (!response.ok) throw new Error('Lookup failed');
+    payload = await response.json();
+  } catch { throw new WhitebooksError('WhiteBooks status lookup failed. The previous submission remains protected; no new bill was generated.'); }
+  const data = payload?.data;
+  if (!['1', 'success', 'sucess'].includes(String(payload?.status_cd).toLowerCase())
+      || String(data?.Irn || '').toLowerCase() !== irn.toLowerCase() || data?.Status !== 'ACT') {
+    throw new WhitebooksError('WhiteBooks lookup did not confirm an active IRN with an e-way bill. Check the portal; no new bill was generated.');
+  }
+  if (!/^\d{12}$/.test(String(data?.EwbNo || ''))) {
+    if (allowMissing && Object.hasOwn(data, 'EwbNo') && data.EwbNo === null) return null;
+    throw new WhitebooksError('WhiteBooks lookup did not confirm whether an e-way bill exists. No new bill was generated.');
+  }
+  return Object.fromEntries(['EwbNo', 'EwbDt', 'EwbValidTill'].filter(key => ['string', 'number'].includes(typeof data[key])).map(key => [key, data[key]]));
+}
+
 export async function generateWhitebooksEwayBill(document, { authToken, irp }, environment = 'sandbox') {
   const { baseUrl, values } = getEInvoiceConfig(environment);
   const selectedIrp = irp || process.env[environment === 'production' ? 'WHITEBOOKS_PRODUCTION_IRP' : 'WHITEBOOKS_IRP']?.trim();
@@ -126,7 +151,7 @@ export async function generateWhitebooksEwayBill(document, { authToken, irp }, e
   }
   const data = payload?.data;
   if (!['1', 'success', 'sucess'].includes(String(payload?.status_cd).toLowerCase()) || !/^\d{12}$/.test(String(data?.EwbNo || ''))) {
-    throw new WhitebooksError('WhiteBooks did not confirm an e-way bill. Check the submission in WhiteBooks before trying again.');
+    throw new WhitebooksError('WhiteBooks did not confirm an e-way bill. Use Check WhiteBooks status to recover any existing bill before trying again.');
   }
   return Object.fromEntries(['EwbNo', 'EwbDt', 'EwbValidTill'].filter(key => ['string', 'number'].includes(typeof data[key])).map(key => [key, data[key]]));
 }

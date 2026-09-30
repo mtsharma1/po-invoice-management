@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { getInvoice } from './invoices';
+import { getWhitebooksEwayBillByIrn } from './whitebooks';
 import { prepareEInvoice } from './eInvoice';
 import { query } from './db';
 import { getProductionIrn } from './whitebooksProductionIrn';
@@ -127,13 +128,18 @@ export async function generateEwayBill(invoiceNo, transport, draft, environment 
   const irn = sourceIrn || headerIrn;
   let document, auth, key, generate;
   if (irn) {
-    document = prepareEwayBill(irn, transport);
+
     if (environment === 'production' && String(invoice.header.GSTN || '').trim() !== getEInvoiceConfig(environment).values.gstin?.trim()) {
       throw new WhitebooksError('Supplier GSTIN must match WHITEBOOKS_PRODUCTION_GSTIN for generation using IRN.');
     }
     auth = await authenticateWhitebooks(environment);
     auth.irp ||= process.env[environment === 'production' ? 'WHITEBOOKS_PRODUCTION_IRP' : 'WHITEBOOKS_IRP']?.trim();
     if (!auth.irp) throw new WhitebooksError('E-invoice authentication did not identify the IRP. Configure the e-invoice IRP before submitting.');
+    if (environment === 'production') {
+      const found = await getWhitebooksEwayBillByIrn(irn, auth, environment, { allowMissing: true });
+      if (found) return { ok: true, state: 'found', requiresConfirmation: true, result: found };
+    }
+    document = prepareEwayBill(irn, transport);
     key = createHash('sha256').update('IRN:' + irn).digest('hex');
     generate = generateWhitebooksEwayBill;
   } else {
@@ -164,6 +170,38 @@ export async function generateEwayBill(invoiceNo, transport, draft, environment 
     await query(`UPDATE ${table} SET State = ? WHERE InvoiceNo = ?`, ['uncertain', invoiceNo]).catch(() => {});
     if (result) return { ok: true, state: 'uncertain', result, warning: 'E-way bill generated but saving failed. Download the result and reconcile in WhiteBooks.' };
     throw error;
+  }
+  return { ok: true, state: 'succeeded', result };
+}
+
+export async function reconcileEwayBill(invoiceNo, environment = getEwayBillEnvironment(), confirmedEwbNo = null) {
+  if (environment !== 'production') throw new WhitebooksError('This status recovery is available for production IRNs.');
+  const existing = await getEwayBill(invoiceNo, environment);
+  if (existing?.state === 'succeeded') return { ok: true, ...existing };
+  const invoice = await getInvoice(invoiceNo);
+  const irn = String(invoice?.header?.IRN || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(irn)) throw new WhitebooksError('A valid saved production IRN is required.');
+  const source = await getProductionIrn(invoiceNo);
+  if (source?.result?.Irn && source.result.Irn.toLowerCase() !== irn) throw new WhitebooksError('Saved IRNs conflict. Reconcile the invoice first.');
+  if (String(invoice.header.GSTN || '').trim() !== getEInvoiceConfig(environment).values.gstin?.trim()) throw new WhitebooksError('Supplier GSTIN must match the production account.');
+  const auth = await authenticateWhitebooks(environment);
+  auth.irp ||= process.env.WHITEBOOKS_PRODUCTION_IRP?.trim();
+  const result = await getWhitebooksEwayBillByIrn(irn, auth, environment, { allowMissing: true });
+  if (!result) return { ok: true, state: 'not_found', result: null };
+  if (confirmedEwbNo === null) return { ok: true, state: 'found', requiresConfirmation: true, result };
+  if (String(result.EwbNo) !== confirmedEwbNo) throw new WhitebooksError('WhiteBooks details changed. Check status and confirm the displayed bill again.');
+  // Never clear an uncertain submission or call a generation API during recovery.
+  if (existing) {
+    const saved = await query(`UPDATE ${resultTable(environment)} SET State = ?, ResultJson = ? WHERE InvoiceNo = ?`, ['succeeded', JSON.stringify(result), invoiceNo]);
+    if (saved.affectedRows !== 1) throw new WhitebooksError('Existing e-way bill found, but saving failed. Check status again; do not regenerate.');
+  } else {
+    const key = createHash('sha256').update('IRN:' + irn).digest('hex');
+    try {
+      await query(`INSERT INTO ${resultTable(environment)} (InvoiceNo, DocumentKey, State, RequestJson, ResultJson) VALUES (?, ?, ?, ?, ?)`, [invoiceNo, key, 'succeeded', JSON.stringify({ Irn: irn }), JSON.stringify(result)]);
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') throw new WhitebooksError('Submission status changed. Refresh before saving the existing bill.');
+      throw error;
+    }
   }
   return { ok: true, state: 'succeeded', result };
 }
