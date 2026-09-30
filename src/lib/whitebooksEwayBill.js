@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
+import { getInvoice } from './invoices';
 import { prepareEInvoice } from './eInvoice';
 import { query } from './db';
 import { getProductionIrn } from './whitebooksProductionIrn';
 import { getSandboxIrn } from './whitebooksIrn';
-import { authenticateWhitebooksEwayBill, generateStandaloneWhitebooksEwayBill, WhitebooksError, getEwayBillConfig, getEwayBillEnvironment } from './whitebooks';
+import { authenticateWhitebooks, generateWhitebooksEwayBill, getEInvoiceConfig, authenticateWhitebooksEwayBill, generateStandaloneWhitebooksEwayBill, WhitebooksError, getEwayBillConfig, getEwayBillEnvironment } from './whitebooks';
 
 async function ensureTable() {
   await query(`CREATE TABLE IF NOT EXISTS webWhitebooksSandboxEwayBill (
@@ -26,7 +27,7 @@ async function getLegacyEwayBill(invoiceNo) {
 
 export function prepareEwayBill(irn, input = {}) {
   const text = key => typeof input[key] === 'string' ? input[key].trim() : '';
-  if (!/^[a-f0-9]{64}$/i.test(irn || '')) throw new WhitebooksError('A saved sandbox IRN is required.');
+  if (!/^[a-f0-9]{64}$/i.test(irn || '')) throw new WhitebooksError('A valid saved IRN is required.');
   const distance = Number(input.Distance);
   if (input.Distance === '' || input.Distance == null || !Number.isInteger(distance) || distance < 0 || distance > 4000) throw new WhitebooksError('Distance must be a whole number from 0 to 4000 km.');
   const mode = text('TransMode');
@@ -113,14 +114,41 @@ export async function generateEwayBill(invoiceNo, transport, draft, environment 
   const existing = await getEwayBill(invoiceNo, environment);
   if (existing?.state === 'succeeded') return { ok: true, ...existing };
   if (existing) throw new WhitebooksError('A previous e-way bill request is pending or uncertain. Reconcile it in WhiteBooks before resubmitting.');
-  const prepared = await prepareEInvoice(invoiceNo, { ...draft, ewayBill: { ...transport, enabled: false } });
-  if (!prepared.valid) return { ok: false, error: 'Correct invoice details before generating the e-way bill.', validation: prepared };
-  const document = buildStandaloneEwayBill(prepared.document, transport);
-  if (document.docNo !== invoiceNo) throw new WhitebooksError('Document number must match the selected invoice number.');
-  if (document.fromGstin !== getEwayBillConfig(environment).values.gstin?.trim()) throw new WhitebooksError('Supplier GSTIN must match the configured e-way bill GSTIN.');
-  const auth = await authenticateWhitebooksEwayBill(environment);
-  const [, month, year] = document.docDate.split('/').map(Number);
-  const key = createHash('sha256').update(JSON.stringify([document.fromGstin, month >= 4 ? year : year - 1, document.docType, document.docNo.toUpperCase()])).digest('hex');
+  // Production B2B invoices use their registered IRN, never editable browser invoice data.
+  const source = environment === 'production' ? await getProductionIrn(invoiceNo) : await getSandboxIrn(invoiceNo);
+  const invoice = environment === 'production' ? await getInvoice(invoiceNo) : null;
+  if (environment === 'production' && !invoice?.header) throw new WhitebooksError('Invoice not found.');
+  const storedIrn = String(invoice?.header?.IRN || '').trim().toLowerCase();
+  const headerIrn = ['null', 'undefined'].includes(storedIrn) ? '' : storedIrn;
+  const sourceIrn = String(source?.result?.Irn || '').trim().toLowerCase();
+  if (sourceIrn && headerIrn && sourceIrn !== headerIrn) throw new WhitebooksError('Saved invoice IRN conflicts with the production result. Reconcile before generating an e-way bill.');
+  if (source?.result?.Status && source.result.Status !== 'ACT') throw new WhitebooksError('The saved IRN is not active.');
+  if (source && !sourceIrn) throw new WhitebooksError('The IRN submission is pending or uncertain. Reconcile it before generating an e-way bill.');
+  const irn = sourceIrn || headerIrn;
+  let document, auth, key, generate;
+  if (irn) {
+    document = prepareEwayBill(irn, transport);
+    if (environment === 'production' && String(invoice.header.GSTN || '').trim() !== getEInvoiceConfig(environment).values.gstin?.trim()) {
+      throw new WhitebooksError('Supplier GSTIN must match WHITEBOOKS_PRODUCTION_GSTIN for generation using IRN.');
+    }
+    auth = await authenticateWhitebooks(environment);
+    auth.irp ||= process.env[environment === 'production' ? 'WHITEBOOKS_PRODUCTION_IRP' : 'WHITEBOOKS_IRP']?.trim();
+    if (!auth.irp) throw new WhitebooksError('E-invoice authentication did not identify the IRP. Configure the e-invoice IRP before submitting.');
+    key = createHash('sha256').update('IRN:' + irn).digest('hex');
+    generate = generateWhitebooksEwayBill;
+  } else {
+    if (environment === 'production') throw new WhitebooksError('Generate and save the IRN first for this B2B invoice, then generate its e-way bill.');
+    const prepared = await prepareEInvoice(invoiceNo, { ...draft, ewayBill: { ...transport, enabled: false } });
+    if (!prepared.valid) return { ok: false, error: 'Correct invoice details before generating the e-way bill.', validation: prepared };
+    document = buildStandaloneEwayBill(prepared.document, transport);
+    if (document.docNo !== invoiceNo) throw new WhitebooksError('Document number must match the selected invoice number.');
+    const configuredGstin = getEwayBillConfig(environment).values.gstin?.trim();
+    if (configuredGstin && document.fromGstin !== configuredGstin) throw new WhitebooksError('Supplier GSTIN must match the configured e-way bill GSTIN.');
+    auth = await authenticateWhitebooksEwayBill(environment);
+    const [, month, year] = document.docDate.split('/').map(Number);
+    key = createHash('sha256').update(JSON.stringify([document.fromGstin, month >= 4 ? year : year - 1, document.docType, document.docNo.toUpperCase()])).digest('hex');
+    generate = generateStandaloneWhitebooksEwayBill;
+  }
   try {
     await query(`INSERT INTO ${table} (InvoiceNo, DocumentKey, State, RequestJson) VALUES (?, ?, ?, ?)`, [invoiceNo, key, 'pending', JSON.stringify(document)]);
   } catch (error) {
@@ -129,8 +157,9 @@ export async function generateEwayBill(invoiceNo, transport, draft, environment 
   }
   let result;
   try {
-    result = await generateStandaloneWhitebooksEwayBill(document, auth, environment);
-    await query(`UPDATE ${table} SET State = ?, ResultJson = ? WHERE InvoiceNo = ?`, ['succeeded', JSON.stringify(result), invoiceNo]);
+    result = await generate(document, auth, environment);
+    const saved = await query(`UPDATE ${table} SET State = ?, ResultJson = ? WHERE InvoiceNo = ?`, ['succeeded', JSON.stringify(result), invoiceNo]);
+    if (saved.affectedRows !== 1) throw new Error('E-way bill result was not saved.');
   } catch (error) {
     await query(`UPDATE ${table} SET State = ? WHERE InvoiceNo = ?`, ['uncertain', invoiceNo]).catch(() => {});
     if (result) return { ok: true, state: 'uncertain', result, warning: 'E-way bill generated but saving failed. Download the result and reconcile in WhiteBooks.' };

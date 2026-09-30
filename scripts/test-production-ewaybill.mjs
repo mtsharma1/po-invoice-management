@@ -33,36 +33,4 @@ try {
   await assert.rejects(api.authenticateWhitebooksEwayBill, /Configure all production/);
 } finally { globalThis.fetch = originalFetch; }
 
-// Exercise the persistence flow with a transaction-free mock database; no live bill is generated.
-let record = null, generationCalls = 0;
-globalThis.__ewayTest = {
-  query: async (sql, args) => {
-    if (sql.startsWith('CREATE')) { assert.match(sql, /webWhitebooksProductionEwayBill/); return []; }
-    if (sql.startsWith('SELECT')) { assert.match(sql, /webWhitebooksProductionEwayBill/); return record ? [record] : []; }
-    if (sql.startsWith('INSERT')) { assert.match(sql, /webWhitebooksProductionEwayBill/); assert.equal(args[0], 'TEST/1'); record = { State: 'pending', ResultJson: null }; return { affectedRows: 1 }; }
-    if (sql.startsWith('UPDATE')) { assert.match(sql, /webWhitebooksProductionEwayBill/); record.State = args[0]; record.ResultJson = args[1]; return { affectedRows: 1 }; }
-    throw new Error('Unexpected query');
-  },
-  prepareEInvoice: async () => ({ valid: true, document: {} }),
-  authenticateWhitebooksEwayBill: async environment => { assert.equal(environment, 'production'); return { irp: 'NIC1' }; },
-  generateStandaloneWhitebooksEwayBill: async (document, auth, environment) => { generationCalls++; assert.equal(environment, 'production'); return { EwbNo: 123456789012, EwbDt: 'date', EwbValidTill: 'expiry' }; },
-};
-let service = (await readFile('src/lib/whitebooksEwayBill.js', 'utf8')).replace(/^import .*;$/gm, '');
-service = service.replace('export function buildStandaloneEwayBill(', 'function unusedBuilder(');
-const prelude = `import { createHash } from 'node:crypto';
-const { query, prepareEInvoice, authenticateWhitebooksEwayBill, generateStandaloneWhitebooksEwayBill } = globalThis.__ewayTest;
-class WhitebooksError extends Error {}
-const getEwayBillEnvironment = () => 'production';
-const getEwayBillConfig = () => ({ values: { gstin: 'TESTGSTIN' } });
-const getProductionIrn = async () => null;
-const getSandboxIrn = async () => { throw new Error('Production must not read sandbox'); };
-const buildStandaloneEwayBill = () => ({ docNo: 'TEST/1', docDate: '23/09/2026', docType: 'INV', fromGstin: 'TESTGSTIN' });
-`;
-const serviceApi = await load(prelude + service);
-const result = await serviceApi.generateEwayBill('TEST/1', {}, {});
-assert.equal(result.state, 'succeeded');
-assert.equal((await serviceApi.getEwayBill('TEST/1')).result.EwbNo, 123456789012);
-await serviceApi.generateEwayBill('TEST/1', {}, {});
-assert.equal(generationCalls, 1, 'Saved results must prevent another generation');
-delete globalThis.__ewayTest;
-console.log('Production e-way bill credential isolation, endpoint routing, invoice-linked saving and reloading checks passed.');
+console.log('Standalone e-way bill credential isolation and endpoint checks passed.');

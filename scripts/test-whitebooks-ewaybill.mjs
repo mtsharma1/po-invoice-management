@@ -10,7 +10,7 @@ const body = prepareEwayBill(irn, transport);
 assert.equal(body.VehNo, 'KA12ER1234');
 assert.equal(body.Distance, 100);
 assert.equal(body.Irn, irn);
-assert.throws(() => prepareEwayBill('', transport), /saved sandbox IRN/);
+assert.throws(() => prepareEwayBill('', transport), /valid saved IRN/);
 assert.throws(() => prepareEwayBill(irn, { ...transport, Distance: -1 }), /Distance/);
 assert.throws(() => prepareEwayBill(irn, { ...transport, TransMode: '2' }), /document number/);
 assert.throws(() => prepareEwayBill(irn, { ...transport, TransDocDt: '31\/02\/2026' }), /valid DD/);
