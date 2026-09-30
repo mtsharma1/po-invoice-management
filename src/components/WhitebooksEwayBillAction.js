@@ -19,6 +19,20 @@ export default function WhitebooksEwayBillAction({ invoiceNo, transport, draft, 
       }).catch(error => { if (!controller.signal.aborted) setMessage(error.message); });
     return () => controller.abort();
   }, [invoiceNo]);
+  async function saveTransport() {
+    if (busy.current) return;
+    busy.current = true; setPending(true); setMessage('Saving transport details…');
+    try {
+      const response = await fetch('/api/whitebooks/ewaybill', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceNo, transport }),
+      });
+      const body = await response.json();
+      if (!response.ok || !body.ok) throw new Error(body.error || 'Unable to save transport details.');
+      setMessage('Transport details saved for this invoice.');
+    } catch (error) { setMessage(error.message); }
+    finally { busy.current = false; setPending(false); }
+  }
   async function generate() {
     if (busy.current) return;
     if (environment === 'production' && !window.confirm(`Generate a production e-way bill for ${invoiceNo}?`)) return;
@@ -40,9 +54,12 @@ export default function WhitebooksEwayBillAction({ invoiceNo, transport, draft, 
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return <section className="einvoice-section" aria-label="WhiteBooks e-way bill">
-    <header><div><h3>WhiteBooks {environment} e-way bill</h3><p>Generate from the invoice and transport details using standalone e-way bill authentication.</p></div></header>
+    <header><div><h3>WhiteBooks {environment} e-way bill</h3><p>Production generation uses the saved IRN and e-invoice authentication. Save transport details before leaving this invoice.</p></div></header>
     <div className="einvoice-section-body">
-      <div className="einvoice-actionbar"><button type="button" className="einvoice-download" disabled={!loaded || pending || Boolean(submission)} onClick={generate}>{pending ? 'Generating…' : `Generate ${environment} e-way bill`}</button></div>
+      <div className="einvoice-actionbar">
+        <button type="button" className="einvoice-download" disabled={pending} onClick={saveTransport}>Save transport details</button>
+        <button type="button" className="einvoice-download" disabled={!loaded || pending || Boolean(submission)} onClick={generate}>{pending ? 'Please wait…' : `Generate ${environment} e-way bill`}</button>
+      </div>
       {submission?.result ? <><p>E-way bill: {submission.result.EwbNo}</p><p>Generated: {submission.result.EwbDt} · Valid until: {submission.result.EwbValidTill}</p><button type="button" onClick={download}>Download e-way bill result</button></> : null}
       {submission && submission.state !== 'succeeded' ? <p>Previous submission pending or uncertain. Check WhiteBooks before resubmitting.</p> : null}
       <p role="status" aria-live="polite">{message}</p>

@@ -1,4 +1,5 @@
 import { isSameOriginRequest } from '@/lib/requestOrigin';
+import { saveEwayBillTransport } from '@/lib/ewayBillTransport';
 import { getCurrentSession } from '@/lib/auth';
 import { canAccessFeature, FEATURES } from '@/lib/permissions';
 import { generateEwayBill, getEwayBill } from '@/lib/whitebooksEwayBill';
@@ -21,6 +22,10 @@ async function handle(request, generate) {
     catch { return json({ ok: false, error: 'Invalid JSON request.' }, 400); }
     const invoiceNo = typeof payload?.invoiceNo === 'string' ? payload.invoiceNo.trim() : '';
     if (!invoiceNo || invoiceNo.length > 255) return json({ ok: false, error: 'A valid invoice number is required.' }, 400);
+    if (generate) {
+      await saveEwayBillTransport(invoiceNo, payload.transport);
+      if (request.method === 'PUT') return json({ ok: true });
+    }
     const environment = getEwayBillEnvironment();
     const result = generate
       ? await generateEwayBill(invoiceNo, payload.transport, payload.draft, environment)
@@ -33,3 +38,4 @@ async function handle(request, generate) {
 
 export const GET = (request) => handle(request, false);
 export const POST = (request) => handle(request, true);
+export const PUT = (request) => handle(request, true);

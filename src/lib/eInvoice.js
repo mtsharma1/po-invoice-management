@@ -1,4 +1,5 @@
 import { getInvoice, listInvoices } from './invoices';
+import { getEwayBillTransport } from './ewayBillTransport';
 
 export const SUPPLY_TYPES = Object.freeze([
   { value: 'B2B', label: 'B2B — Business to business' },
@@ -52,6 +53,8 @@ export async function getEInvoiceScreenData({ invoiceNo = '', search = '' } = {}
   const invoice = await getInvoice(invoiceNo);
   if (!invoice.header) return { rows: filteredRows, draft: null, validation: null, search };
   const draft = createEInvoiceDraft(invoice);
+  const transport = await getEwayBillTransport(invoiceNo);
+  if (transport) draft.ewayBill = { ...draft.ewayBill, ...transport };
   const prepared = prepareFromInvoice(invoice, draft);
   return {
     rows: filteredRows,

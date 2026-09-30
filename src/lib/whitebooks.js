@@ -104,12 +104,15 @@ export async function authenticateWhitebooks(environment = getEInvoiceEnvironmen
 }
 
 
-export async function generateWhitebooksEwayBill(document, { authToken, irp }) {
-  if (!irp) throw new WhitebooksError('WhiteBooks authentication did not identify the IRP. Configure WHITEBOOKS_IRP for this sandbox account.');
-  const url = new URL('https://apisandbox.whitebooks.in/einvoice/type/GENERATE_EWAYBILL/version/V1_03');
-  url.searchParams.set('email', process.env.WHITEBOOKS_EMAIL.trim());
-  url.searchParams.set('irp', irp);
-  const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'username', 'gstin'].map(field => [field, process.env[FIELDS[field]]]));
+export async function generateWhitebooksEwayBill(document, { authToken, irp }, environment = 'sandbox') {
+  const { baseUrl, values } = getEInvoiceConfig(environment);
+  const selectedIrp = irp || process.env[environment === 'production' ? 'WHITEBOOKS_PRODUCTION_IRP' : 'WHITEBOOKS_IRP']?.trim();
+  if (!selectedIrp) throw new WhitebooksError('WhiteBooks authentication did not identify the IRP. Configure the e-invoice IRP setting before generating an e-way bill.');
+  if (!authToken) throw new WhitebooksError('E-invoice authentication is required.');
+  const url = new URL('/einvoice/type/GENERATE_EWAYBILL/version/V1_03', baseUrl);
+  url.searchParams.set('email', values.email.trim());
+  url.searchParams.set('irp', selectedIrp);
+  const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'username', 'gstin'].map(field => [field, values[field]]));
   let payload;
   try {
     const response = await fetch(url, {
@@ -149,8 +152,11 @@ export function getEwayBillConfig(environment = getEwayBillEnvironment()) {
 // Standalone EWB authentication. Do not pair this token with IRP/e-invoice endpoints.
 export async function authenticateWhitebooksEwayBill(environment = getEwayBillEnvironment()) {
   const { values: config, baseUrl, irp } = getEwayBillConfig(environment);
-  if (Object.values(config).some(value => !value?.trim()) || !irp) {
-    throw new WhitebooksError(`Configure all ${environment} e-way bill credentials and the IRP value before authentication.`);
+  const prefix = environment === 'production' ? 'WHITEBOOKS_EWAYBILL_PRODUCTION_' : 'WHITEBOOKS_';
+  const missing = Object.entries(config).filter(([, value]) => !value?.trim()).map(([key]) => prefix + key.toUpperCase());
+  if (!irp) missing.push(prefix + 'IRP');
+  if (missing.length) {
+    throw new WhitebooksError(`Configure all ${environment} e-way bill credentials. Missing settings: ${missing.join(', ')}. Restart the app after updating the server environment.`);
   }
   const url = new URL('/ewaybillapi/v1.03/authenticate', baseUrl);
   for (const [key, value] of Object.entries({ email: config.email, username: config.username, password: config.password, irp })) url.searchParams.set(key, value);
