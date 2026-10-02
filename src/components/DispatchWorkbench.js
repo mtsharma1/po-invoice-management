@@ -10,6 +10,7 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
   const uploadInputRef = useRef(null);
   const [message, setMessage] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
   const [draftRows, setDraftRows] = useState(rows);
   const [isPending, startTransition] = useTransition();
   const isEditMode = mode === 'edit';
@@ -133,6 +134,31 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
     uploadInputRef.current?.click();
   }
 
+  async function downloadRemainingItems() {
+    setIsDownloading(true);
+    try {
+      const response = await fetch(`/api/dispatch/export?poBarcode=${encodeURIComponent(selectedPO)}`);
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Download failed.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `RemainingItems_${selectedPO.replace(/[^a-z0-9_-]+/gi, '_')}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMessage('Remaining items downloaded.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
   async function uploadDispatchFile(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -217,6 +243,15 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
             <a className="dispatch-action ghost" href="/api/dispatch/template">
               <ActionIcon name="download" /> Download template
             </a>
+            <button
+              className="dispatch-action ghost"
+              type="button"
+              onClick={downloadRemainingItems}
+              disabled={!selectedPO || !isEditMode || isPending || isDownloading || !draftRows.some((row) => Number(row.PendingQuantity) > 0)}
+              title="Create a dispatch to download items with a remaining pending quantity"
+            >
+              <ActionIcon name="download" /> {isDownloading ? 'Downloading…' : 'Download remaining items'}
+            </button>
             <input
               ref={uploadInputRef}
               className="hidden-file-input"

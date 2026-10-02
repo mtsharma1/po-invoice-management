@@ -76,7 +76,7 @@ export default function WhitebooksEwayBillAction({ invoiceNo, transport, draft, 
       <div className="einvoice-actionbar">
         <button type="button" className="einvoice-download" disabled={pending} onClick={saveTransport}>Save transport details</button>
         <button type="button" className="einvoice-download" disabled={!loaded || pending || Boolean(submission) || Boolean(foundBill)} onClick={generate}>{pending ? 'Please wait…' : `Generate ${environment} e-way bill`}</button>
-        {environment === 'production' ? <button type="button" className="einvoice-download" disabled={!loaded || pending} onClick={() => checkStatus(false)}>Check WhiteBooks status</button> : null}
+        {environment === 'production' ? <button type="button" className="einvoice-download" disabled={!loaded || pending} onClick={() => checkStatus(false)}>Check E-Way Bill Status</button> : null}
       </div>
       {foundBill ? <div role="region" aria-label="Existing e-way bill confirmation">
         <p><strong>An e-way bill already exists for this invoice’s IRN.</strong></p>
