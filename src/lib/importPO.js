@@ -160,6 +160,7 @@ const allowedCategories = new Map([
   ['suitcase', 'SuitCase'],
   ['backpack', 'BackPack'],
   ['smallhardcase', 'Small Hard Case'],
+  ['gurgaonslg', 'Gurgaon SLG'],
 ]);
 
 export class PurchaseOrderValidationError extends Error {
@@ -656,7 +657,7 @@ function readDetailRows(worksheet, headerRow, columnMap, poBarcode) {
         worksheet: worksheet.name,
         row,
         field: 'Category',
-        reason: `Category must be SuitCase, BackPack, or Small Hard Case; received "${String(rawCategory).trim()}".`,
+        reason: `Category must be SuitCase, BackPack, Small Hard Case, or Gurgaon SLG; received "${String(rawCategory).trim()}".`,
       }));
     }
 
