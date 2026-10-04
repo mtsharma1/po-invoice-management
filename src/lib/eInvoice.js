@@ -1,5 +1,6 @@
 import { getInvoice, listInvoices } from './invoices';
 import { getEwayBillTransport } from './ewayBillTransport';
+import { lineTaxRates, usesItemTaxDetails } from './invoiceTax';
 
 export const SUPPLY_TYPES = Object.freeze([
   { value: 'B2B', label: 'B2B — Business to business' },
@@ -193,12 +194,13 @@ function buildDocument(invoice, draft) {
   const seller = normalizedParty(draft.seller);
   const buyer = normalizedParty(draft.buyer);
   const supTyp = clean(draft.tran.SupTyp).toUpperCase();
-  const gstRate = invoiceGstRate(invoice.header);
   const withoutPayment = WITHOUT_PAYMENT_TYPES.has(supTyp);
   const useIgst = WITH_PAYMENT_TYPES.has(supTyp)
     || (!withoutPayment && (seller.Stcd !== clean(draft.buyer.Pos) || clean(draft.tran.IgstOnIntra).toUpperCase() === 'Y'));
   const includeFreeQuantity = draft.outputOptions?.includeFreeQuantity !== false;
-  const itemList = invoice.lines.map((line, index) => buildItem(line, index, gstRate, useIgst, withoutPayment, includeFreeQuantity));
+  const itemList = invoice.lines.map((line, index) => buildItem(line, index,
+    usesItemTaxDetails(invoice.header) ? lineTaxRates(invoice.header, line).taxRate : invoiceGstRate(invoice.header),
+    useIgst, withoutPayment, includeFreeQuantity));
   const assVal = sumMoney(itemList, 'AssAmt');
   const igstVal = sumMoney(itemList, 'IgstAmt');
   const cgstVal = sumMoney(itemList, 'CgstAmt');

@@ -995,6 +995,19 @@ table.data-table {
 .invoice-lines th:nth-child(9) { width: 9%; }
 .invoice-lines th:nth-child(10) { width: 9%; }
 .invoice-lines th:nth-child(11) { width: 12%; }
+/* Keep the first five item columns at 50%, matching the party/meta divider.
+   The remaining seven columns must also total 50%, including Tax %. */
+.invoice-item-tax .invoice-lines th:nth-child(6) { width: 8%; }
+.invoice-item-tax .invoice-lines th:nth-child(7) { width: 5%; }
+.invoice-item-tax .invoice-lines th:nth-child(8) { width: 5%; }
+.invoice-item-tax .invoice-lines th:nth-child(9) { width: 8%; }
+.invoice-item-tax .invoice-lines th:nth-child(10) { width: 8%; }
+.invoice-item-tax .invoice-lines th:nth-child(11) { width: 4%; }
+.invoice-item-tax .invoice-lines th:nth-child(12) { width: 12%; }
+.invoice-item-tax .invoice-meta,
+.invoice-item-tax .party-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.invoice-item-tax .party-block { min-width: 0; }
+.invoice-item-tax .party-address { overflow-wrap: anywhere; }
 .invoice-lines td.num { white-space: nowrap; }
 
 .invoice-summary {
@@ -1009,6 +1022,10 @@ table.data-table {
   grid-template-columns: 4fr 12fr 9fr 8fr 17fr 9fr 6fr 5fr 9fr 9fr 12fr;
   align-items: center;
   min-height: 24px;
+}
+
+.invoice-item-tax .quantity-total-row {
+  grid-template-columns: 4fr 12fr 9fr 8fr 17fr 8fr 5fr 5fr 8fr 8fr 4fr 12fr;
 }
 
 .quantity-total-row strong {
@@ -1086,6 +1103,14 @@ table.data-table {
   margin-top: 16px;
   min-height: 250px;
 }
+
+.invoice-item-tax .invoice-footer { grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); }
+.invoice-tax-summary { padding-top: 115px; min-width: 0; }
+.invoice-tax-summary table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.invoice-tax-summary caption { text-align: left; font-weight: 700; padding-bottom: 5px; }
+.invoice-tax-summary th, .invoice-tax-summary td { border: 1px solid #000; padding: 5px 3px; }
+.invoice-tax-summary th { text-align: left; background: #f3f3f3; }
+.invoice-tax-summary td { text-align: right; }
 
 .invoice-footer-details {
   display: grid;
@@ -6823,3 +6848,33 @@ table thead th,
   .einvoice-sequential .einvoice-output-option { flex-wrap: wrap; }
   .einvoice-sequential .einvoice-hero { flex-wrap: wrap; padding: 14px 16px; }
 }
+
+/* Invoice presentation: scope the revised printed layout to new-format invoices. */
+.invoice-main-block, .invoice-bottom-block { display: contents; }
+.invoice-main-block > .boxed + .boxed,
+.invoice-main-block > .boxed + .invoice-lines { margin-top: -1px; }
+.invoice-item-tax .invoice-main-block { display: block; border: 1px solid #000; }
+.invoice-item-tax .invoice-main-block > .boxed { border-left: 0; border-right: 0; }
+.invoice-item-tax .invoice-main-block > .invoice-top-grid { border-top: 0; }
+.invoice-item-tax .invoice-summary { margin-top: 0; padding-bottom: 14px; }
+.invoice-item-tax .invoice-bottom-block { display: block; border: 1px solid #000; margin-top: 14px; }
+.invoice-item-tax .invoice-bottom-block > .words-strip { margin: 0; border: 0; border-bottom: 1px solid #000; }
+.invoice-item-tax .invoice-footer { padding: 14px 0; margin: 0; gap: 18px; }
+.invoice-item-tax .invoice-tax-summary { padding-top: 28px; }
+.invoice-printed-note { border: 1px solid #000; padding: 7px; min-height: 56px; margin-bottom: 28px; overflow-wrap: anywhere; }
+.invoice-printed-note > div { white-space: pre-wrap; margin-top: 5px; }
+.invoice-item-tax .invoice-footer-details { gap: 16px; }
+.invoice-item-tax .signature { min-height: 120px; align-content: space-between; border: 0; }
+.invoice-item-tax .signature strong { border: 1px solid #000; }
+.invoice-item-tax .signature span { border: 1px solid #000; }
+.invoice-item-tax .bank-box { width: 100%; }
+.invoice-item-tax .bank-box div { grid-template-columns: 120px minmax(0, 1fr); }
+.invoice-item-tax .bank-box span { text-align: right; overflow-wrap: anywhere; }
+.invoice-item-tax .invoice-lines th:nth-child(2) { width: 16%; }
+.invoice-item-tax .invoice-lines th:nth-child(5) { width: 13%; }
+.invoice-item-tax .invoice-lines td:nth-child(2) { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.invoice-item-tax .quantity-total-row { grid-template-columns: 4fr 16fr 9fr 8fr 13fr 8fr 5fr 5fr 8fr 8fr 4fr 12fr; }
+.invoice-note-editor { display: grid; gap: 8px; margin: 12px 0; }
+.invoice-note-editor textarea { width: 100%; min-height: 90px; resize: vertical; padding: 10px; border: 1px solid #cbd5e1; border-radius: 5px; font: inherit; }
+
+.invoice-item-tax .invoice-printed-note { width: 60%; max-width: 100%; }
