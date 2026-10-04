@@ -442,7 +442,6 @@ function validateExport(details, required, add) {
 }
 
 function validateEwayBill(details, add) {
-  if (!details.TransId && !details.TransName) add('E-Way Bill', 'TRANSPORTER', 'Enter a transporter ID or transporter name.');
   if (details.TransId && !/^[0-9A-Z]{15}$/.test(details.TransId)) add('E-Way Bill', 'TRANSPORTER_ID', 'Transporter ID must contain 15 letters/numbers.');
   if (!Number.isInteger(details.Distance) || details.Distance < 0 || details.Distance > 4000) add('E-Way Bill', 'DISTANCE', 'Distance must be a whole number from 0 to 4,000 km.');
   if (!TRANSPORT_MODES.has(details.TransMode)) add('E-Way Bill', 'MODE', 'Transport mode must be Road, Rail, Air or Ship.');

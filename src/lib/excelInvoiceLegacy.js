@@ -77,7 +77,9 @@ export async function buildLegacyInvoiceWorkbook({ header, lines, totals }) {
 
   for (let row = 1; row <= printLastRow; row += 1) {
     ws.getRow(row).height = ws.getRow(row).height || 18;
-    ws.getRow(row).font = { name: 'Arial', size: 8, bold: row <= itemHeaderRow };
+    ws.getRow(row).eachCell((cell) => {
+      cell.font = { name: 'Arial', size: 8, ...cell.font };
+    });
   }
 
   return workbook;
@@ -269,6 +271,10 @@ function writeFooter(ws, startRow, header) {
   // A note explicitly saved on an older invoice is printable without changing tax treatment.
   if (header.InvoiceNote) {
     mergeValue(ws, `A${startRow}:G${startRow + 3}`, `Note\n${header.InvoiceNote}`, 'left');
+    ws.getCell(`A${startRow}`).value = { richText: [
+      { text: 'Note', font: { name: 'Arial', size: 8, bold: true } },
+      { text: '\n' + header.InvoiceNote, font: { name: 'Arial', size: 8, bold: false } },
+    ] };
     ws.getCell(`A${startRow}`).alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
     const noteLines = String(header.InvoiceNote).split('\n').reduce((count, line) => count + Math.max(1, Math.ceil(line.length / 85)), 1);
     for (let row = startRow; row <= startRow + 3; row += 1) ws.getRow(row).height = Math.max(18, Math.ceil(noteLines * 12 / 4));
@@ -287,7 +293,7 @@ function writeFooter(ws, startRow, header) {
   });
   box(ws, `H${startRow}:K${startRow + 3}`, borderThin);
   mergeValue(ws, `J${startRow + 9}:K${startRow + 9}`, 'FOR TEAKWOOD', 'center', true, 8, false);
-  mergeValue(ws, `J${startRow + 10}:K${startRow + 10}`, 'AUTH. SIGN', 'center', false, 8, false);
+  mergeValue(ws, `J${startRow + 10}:K${startRow + 10}`, 'AUTH. SIGN', 'center', true, 8, false);
   box(ws, `J${startRow + 9}:K${startRow + 10}`, borderThin);
 }
 

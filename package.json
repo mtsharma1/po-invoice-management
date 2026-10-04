@@ -13,9 +13,11 @@
   },
   "dependencies": {
     "@next/env": "latest",
+    "bwip-js": "^4.11.4",
     "exceljs": "latest",
     "mysql2": "latest",
     "next": "latest",
+    "pdfkit": "^0.20.2",
     "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest"

@@ -7,6 +7,20 @@ const { prepareEwayBill, buildStandaloneEwayBill } = await load('class Whitebook
 const irn = 'a'.repeat(64);
 const transport = { Distance: '100', TransMode: '1', VehType: 'R', VehNo: 'ka12er1234' };
 const body = prepareEwayBill(irn, transport);
+const invoiceValidationSource = (await readFile('src/lib/eInvoice.js', 'utf8')).replace(/^import .*;$/gm, '');
+const { validateEwayBill } = await load(invoiceValidationSource + '\nexport { validateEwayBill };');
+const validateTransport = input => {
+  const errors = [];
+  validateEwayBill(input, (section, code, message) => errors.push({ section, code, message }));
+  return errors;
+};
+const optionalTransport = { TransId: null, TransName: null, Distance: 0, TransMode: '1', VehType: 'R', VehNo: 'HR63G7626' };
+assert.deepEqual(validateTransport(optionalTransport), []);
+assert.deepEqual(validateTransport({ ...optionalTransport, TransId: '', TransName: '' }), []);
+assert.ok(validateTransport({ ...optionalTransport, TransId: 'INVALID' }).some(error => error.code === 'TRANSPORTER_ID'));
+assert.ok(validateTransport({ ...optionalTransport, VehNo: '' }).some(error => error.code === 'VEHICLE_NUMBER'));
+assert.equal(Object.hasOwn(body, 'TransId'), false);
+assert.equal(Object.hasOwn(body, 'TransName'), false);
 assert.equal(body.VehNo, 'KA12ER1234');
 assert.equal(body.Distance, 100);
 assert.equal(body.Irn, irn);

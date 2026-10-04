@@ -84,7 +84,9 @@ export async function buildInvoiceWorkbook({ header, lines, totals }) {
 
   for (let row = 1; row <= printLastRow; row += 1) {
     ws.getRow(row).height = ws.getRow(row).height || 18;
-    ws.getRow(row).font = { name: 'Arial', size: 8, bold: row <= itemHeaderRow };
+    ws.getRow(row).eachCell((cell) => {
+      cell.font = { name: 'Arial', size: 8, ...cell.font };
+    });
   }
 
   return workbook;
@@ -286,6 +288,7 @@ function writeTaxSummary(ws, startRow, totals, first, last) {
   headers.forEach((label, index) => {
     const cell = ws.getRow(startRow).getCell(index + 1);
     cell.value = label;
+    cell.font = bold();
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F3F3' } };
     cell.alignment = { wrapText: true, vertical: 'middle' };
     cell.border = allBorders(borderThin);
@@ -335,11 +338,15 @@ function writeFooter(ws, startRow, header, signatureEnd) {
   const noteRow = startRow + 2;
   const note = 'Note\n' + text(header.InvoiceNote);
   mergeValue(ws, `A${noteRow}:D${noteRow + 2}`, note, 'left', false);
+  ws.getCell(`A${noteRow}`).value = { richText: [
+    { text: 'Note', font: { name: 'Arial', size: 8, bold: true } },
+    { text: '\n' + text(header.InvoiceNote), font: { name: 'Arial', size: 8, bold: false } },
+  ] };
   ws.getCell(`A${noteRow}`).alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
   const noteLines = note.split('\n').reduce((count, line) => count + Math.max(1, Math.ceil(line.length / 48)), 0);
   for (let row = noteRow; row <= noteRow + 2; row += 1) ws.getRow(row).height = Math.max(18, Math.ceil(noteLines * 12 / 3));
   mergeValue(ws, `J${startRow + 6}:L${startRow + 6}`, 'FOR TEAKWOOD', 'center', true);
-  mergeValue(ws, `J${signatureEnd}:L${signatureEnd}`, 'AUTH. SIGN', 'center');
+  mergeValue(ws, `J${signatureEnd}:L${signatureEnd}`, 'AUTH. SIGN', 'center', true);
 
 }
 

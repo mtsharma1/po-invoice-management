@@ -12,6 +12,7 @@ export default function WhitebooksEwayBillAction({ invoiceNo, transport, draft, 
   const [environment, setEnvironment] = useState('sandbox');
   useEffect(() => {
     const controller = new AbortController();
+    setSubmission(null); setFoundBill(null); setLoaded(false); setMessage('');
     fetch(`/api/whitebooks/ewaybill?invoiceNo=${encodeURIComponent(invoiceNo)}`, { cache: 'no-store', signal: controller.signal })
       .then(async response => {
         const body = await response.json();
@@ -64,6 +65,23 @@ export default function WhitebooksEwayBillAction({ invoiceNo, transport, draft, 
     } catch (error) { setMessage(error.message); }
     finally { busy.current = false; setPending(false); }
   }
+  async function downloadPdf() {
+    if (busy.current) return;
+    busy.current = true; setPending(true); setMessage('Preparing e-way bill PDF…');
+    try {
+      const response = await fetch(`/api/whitebooks/ewaybill/pdf?invoiceNo=${encodeURIComponent(invoiceNo)}&environment=${encodeURIComponent(environment)}`, { cache: 'no-store' });
+      if (!response.ok) {
+        const body = await response.json();
+        throw new Error(body.error || 'Unable to download e-way bill PDF.');
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a'); link.href = url;
+      link.download = `${environment}-EwayBill-${submission.result.EwbNo}.pdf`; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMessage('E-way bill PDF downloaded from saved records.');
+    } catch (error) { setMessage(error.message); }
+    finally { busy.current = false; setPending(false); }
+  }
   function download() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(submission.result, null, 2)], { type: 'application/json' }));
     const link = document.createElement('a'); link.href = url;
@@ -89,6 +107,7 @@ export default function WhitebooksEwayBillAction({ invoiceNo, transport, draft, 
         </div>
       </div> : null}
       {submission?.result ? <><p>E-way bill: {submission.result.EwbNo}</p><p>Generated: {submission.result.EwbDt} · Valid until: {submission.result.EwbValidTill}</p><button type="button" onClick={download}>Download e-way bill result</button></> : null}
+      {loaded && submission?.state === 'succeeded' && /^\d{12}$/.test(String(submission?.result?.EwbNo)) ? <button type="button" className="einvoice-download" disabled={pending} onClick={downloadPdf}>Download e-way bill PDF</button> : null}
       {submission && submission.state !== 'succeeded' ? <p>Previous submission pending or uncertain. Check WhiteBooks before resubmitting.</p> : null}
       <p role="status" aria-live="polite">{message}</p>
     </div>

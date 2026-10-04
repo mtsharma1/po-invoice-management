@@ -54,7 +54,6 @@ const directErrorFields = {
   'Export:COUNTRY': ['exportDetails.CntCode'],
   'Export:SHIPPING_BILL_DATE': ['exportDetails.ShipBDt'],
   'Export:PORT_CODE': ['exportDetails.Port'],
-  'E-Way Bill:TRANSPORTER': ['ewayBill.TransId', 'ewayBill.TransName'],
   'E-Way Bill:TRANSPORTER_ID': ['ewayBill.TransId'],
   'E-Way Bill:DISTANCE': ['ewayBill.Distance'],
   'E-Way Bill:MODE': ['ewayBill.TransMode'],
@@ -332,8 +331,8 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
             <Section title="Transport details" subtitle="Enter transport and vehicle details. Production e-way bills use the invoice details registered with the saved IRN.">
 
               <div className="einvoice-form-grid cols-4">
-                  <Field label="Transporter ID" fieldKey="ewayBill.TransId" errors={errorsFor('ewayBill.TransId')}><input value={draft.ewayBill.TransId} onChange={(event) => update('ewayBill', 'TransId', event.target.value.toUpperCase())} /></Field>
-                  <Field label="Transporter name" fieldKey="ewayBill.TransName" errors={errorsFor('ewayBill.TransName')}><input value={draft.ewayBill.TransName} onChange={(event) => update('ewayBill', 'TransName', event.target.value)} /></Field>
+                  <Field label="Transporter ID (optional)" fieldKey="ewayBill.TransId" errors={errorsFor('ewayBill.TransId')}><input value={draft.ewayBill.TransId} onChange={(event) => update('ewayBill', 'TransId', event.target.value.toUpperCase())} /></Field>
+                  <Field label="Transporter name (optional)" fieldKey="ewayBill.TransName" errors={errorsFor('ewayBill.TransName')}><input value={draft.ewayBill.TransName} onChange={(event) => update('ewayBill', 'TransName', event.target.value)} /></Field>
                   <Field label="Distance (km; 0 = automatic)" fieldKey="ewayBill.Distance" errors={errorsFor('ewayBill.Distance')}><input type="number" min="0" max="4000" value={draft.ewayBill.Distance} onChange={(event) => update('ewayBill', 'Distance', event.target.value)} /></Field>
                   <Field label="Mode" fieldKey="ewayBill.TransMode" errors={errorsFor('ewayBill.TransMode')}><select value={draft.ewayBill.TransMode} onChange={(event) => update('ewayBill', 'TransMode', event.target.value)}><option value="1">Road</option><option value="2">Rail</option><option value="3">Air</option><option value="4">Ship</option></select></Field>
                   <Field label="Transport document no"><input value={draft.ewayBill.TransDocNo} onChange={(event) => update('ewayBill', 'TransDocNo', event.target.value)} /></Field>

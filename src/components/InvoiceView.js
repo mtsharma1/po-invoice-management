@@ -131,7 +131,7 @@ export default function InvoiceView({ invoice }) {
           </div>
           <div className="signature">
             <strong>FOR TEAKWOOD</strong>
-            <span>AUTH. SIGN</span>
+            <span><b>AUTH. SIGN</b></span>
           </div>
         </div>
       </footer>

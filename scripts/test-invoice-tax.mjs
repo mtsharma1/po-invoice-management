@@ -81,13 +81,20 @@ for (const selected of [0, 1]) {
   assert.match(sheet.pageSetup.printArea, /L/);
   const cellsWithValue = (value) => {
     const found = [];
-    sheet.eachRow(row => row.eachCell(cell => { if (cell.value === value) found.push(cell); }));
+    sheet.eachRow(row => row.eachCell(cell => { if (cell.text === value) found.push(cell); }));
     return found;
   };
   const noteCell = cellsWithValue(`Note\n${header.InvoiceNote}`)[0];
   assert.ok(noteCell.row < summaryRow);
+  assert.equal(noteCell.value.richText[0].font.bold, true);
+  assert.equal(Boolean(noteCell.value.richText[1].font.bold), false);
+  assert.equal(cellsWithValue('AUTH. SIGN')[0].font.bold, true);
   const beneficiary = cellsWithValue('BENEFICIARY NAME')[0];
   assert.ok(beneficiary);
+  assert.equal(beneficiary.font.bold, true);
+  assert.equal(cellsWithValue('GRAND TOTAL')[0].font.bold, true);
+  assert.equal(cellsWithValue('FOR TEAKWOOD')[0].font.bold, true);
+  assert.equal(sheet.getCell(`A${summaryRow}`).font.bold, true);
   assert.equal(sheet.getCell(`H${beneficiary.row + 1}`).value, 'ACCOUNT NO.');
   assert.equal(sheet.getCell(`H${beneficiary.row + 2}`).value, 'IFSC CODE');
   assert.equal(sheet.getCell(`H${beneficiary.row + 3}`).value, 'BANK NAME');
