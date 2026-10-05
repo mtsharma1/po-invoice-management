@@ -7002,3 +7002,21 @@ table thead th,
 .invoice-item-tax .quantity-total-row strong { grid-column: 7; }
 .invoice-item-tax .invoice-summary { gap: 0; }
 .invoice-item-tax .invoice-bottom-block { margin-top: 0; border-top: 0; }
+
+/* E-way bill actions: consistent controls with distinct action emphasis. */
+.ewaybill-actions .einvoice-actionbar,
+.ewaybill-downloads { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ewaybill-actions .einvoice-actionbar { padding: 16px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.ewaybill-downloads:not(:empty) { margin-top: 18px; padding-top: 18px; border-top: 1px solid #e2e8f0; }
+.ewaybill-actions .ewaybill-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 11px 18px; border: 1px solid transparent; border-radius: 8px; font: inherit; font-size: 14px; font-weight: 600; line-height: 1.4; cursor: pointer; transition: background-color .15s, border-color .15s; }
+.ewaybill-actions .ewaybill-button-primary { background: #3659c9; border-color: #3659c9; color: #fff; }
+.ewaybill-actions .ewaybill-button-primary:hover:not(:disabled) { background: #2946a8; }
+.ewaybill-actions .ewaybill-button-save { background: #e8f5ed; border-color: #afd5bc; color: #17623b; }
+.ewaybill-actions .ewaybill-button-save:hover:not(:disabled) { background: #d4ebdd; }
+.ewaybill-actions .ewaybill-button-secondary { background: #eef2ff; border-color: #c7d2fe; color: #304ba3; }
+.ewaybill-actions .ewaybill-button-secondary:hover:not(:disabled) { background: #e0e7ff; }
+.ewaybill-actions .ewaybill-button-pdf { background: #16704a; border-color: #16704a; color: #fff; }
+.ewaybill-actions .ewaybill-button-pdf:hover:not(:disabled) { background: #105637; }
+.ewaybill-actions .ewaybill-button:disabled { background: #e8ecf2; border-color: #d5dce6; color: #64748b; cursor: not-allowed; opacity: 1; }
+.ewaybill-actions .ewaybill-button:focus-visible { outline: 3px solid #93b4f8; outline-offset: 3px; }
+@media (max-width: 640px) { .ewaybill-actions .ewaybill-button { width: 100%; } }
