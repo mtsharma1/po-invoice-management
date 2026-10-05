@@ -1,7 +1,7 @@
-// Only new invoices explicitly marked on creation use the new rules.
-// Never infer this from the editable invoice date.
-export function usesItemTaxDetails(header) {
-  return Number(header?.TaxDetailsVersion || 0) >= 1;
+// All invoices use the current presentation and item-tax rules, including
+// records created before TaxDetailsVersion was introduced.
+export function usesItemTaxDetails() {
+  return true;
 }
 
 // Preserve the application's existing switch: selected means CGST + SGST.

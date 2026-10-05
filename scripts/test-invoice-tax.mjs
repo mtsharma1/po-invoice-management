@@ -19,8 +19,8 @@ const exportSource = stripImports(await readFile('src/lib/excelInvoice.js', 'utf
 const excel = await load(`${formatSource}\n${taxSource}\nconst invoiceQrBuffer = async () => null;\nconst buildLegacyInvoiceWorkbook = globalThis.__invoiceTaxTestLegacy;\n${exportSource}`);
 const einvoice = await load(`${taxSource}\n${stripImports(await readFile('src/lib/eInvoice.js', 'utf8'))}\nexport { buildDocument };`);
 
-for (const selected of [0, 1]) {
-  const header = { TaxDetailsVersion: 1, InterStateTax: selected, CGST: selected ? 9 : 0, SGST: selected ? 9 : 0, IGSTRate: selected ? 0 : 18 };
+for (const selected of [0, 1]) for (const version of [undefined, 0, 1]) {
+  const header = { TaxDetailsVersion: version, InvoiceDate: '2026-09-01', InterStateTax: selected, CGST: selected ? 9 : 0, SGST: selected ? 9 : 0, IGSTRate: selected ? 0 : 18 };
   header.InvoiceNote = 'Deliver before Friday.\nContact receiving desk.';
   header.BeneficiaryName = 'TEAKWOOD';
   assert.equal(tax.lineTaxRates(header, { VendorArticleName: 'T_SH_TEST', Amount: 2499.99 }).taxRate, 5);
@@ -118,27 +118,27 @@ assert.equal(invoices.calculateInvoiceTotals({}, []).grandTotal, 0);
 for (const InvoiceDate of ['2026-10-01', '2026-10-02', '2027-01-01', null]) {
   const header = { InvoiceDate, IGSTRate: 18, TaxDetailsVersion: 0 };
   const lines = [{ VendorArticleName: 'T_SH_LEGACY', Rate: 2500, Qty: 2, Amount: 5000 }];
-  assert.equal(tax.usesItemTaxDetails(header), false);
+  assert.equal(tax.usesItemTaxDetails(header), true);
   assert.equal(tax.lineTaxRates(header, lines[0]).taxRate, 18);
   const totals = invoices.calculateInvoiceTotals(header, lines);
   assert.equal(totals.igstAmount, 900);
   assert.equal(totals.grandTotal, 5900);
-  assert.equal(totals.taxSummary, undefined);
+  assert.equal(totals.taxSummary[0].taxRate, 18);
   const workbook = await excel.buildInvoiceWorkbook({ header, lines, totals });
   const sheet = workbook.getWorksheet('Invoice');
-  assert.equal(sheet.getCell('K18').value, 'AMOUNT');
-  assert.equal(sheet.getCell('L18').value, null);
-  assert.match(sheet.pageSetup.printArea, /^A1:K/);
-  sheet.eachRow((row) => assert.notEqual(row.getCell(1).value, 'Tax Rate'));
+  assert.equal(sheet.getCell('K18').value, 'Tax %');
+  assert.equal(sheet.getCell('L18').value, 'AMOUNT');
+  assert.match(sheet.pageSetup.printArea, /^A1:L/);
+  assert.equal(tax.lineTaxRates(header, { VendorArticleName: 'T_SH_OLD', Amount: 2500 }).taxRate, 5);
   const draft = einvoice.createEInvoiceDraft({ header, lines });
   draft.seller.Stcd = '06'; draft.buyer.Pos = '07';
   const document = einvoice.buildDocument({ header, lines }, draft);
   assert.equal(document.ItemList[0].GstRt, 18);
   assert.equal(document.ValDtls.TotInvVal, 5900);
 }
-// Preserve aggregate rounding on old invoices, rather than rounding each line.
-assert.equal(invoices.calculateInvoiceTotals({ IGSTRate: 18 }, [{ Qty: 1, Amount: 0.02 }, { Qty: 1, Amount: 0.02 }]).igstAmount, 0.01);
-assert.equal(tax.usesItemTaxDetails({ InvoiceDate: '2026-10-02' }), false);
+// All invoices now use the same per-line rounding and tax rules.
+assert.equal(invoices.calculateInvoiceTotals({ IGSTRate: 18 }, [{ Qty: 1, Amount: 0.02 }, { Qty: 1, Amount: 0.02 }]).igstAmount, 0);
+assert.equal(tax.usesItemTaxDetails({ InvoiceDate: '2026-10-02' }), true);
 assert.equal(tax.usesItemTaxDetails({ TaxDetailsVersion: 1, InvoiceDate: '2026-09-01' }), true);
 
 // Exercise saving old invoices and creating new ones without a database.
@@ -167,4 +167,5 @@ await customer.saveCustomerInvoice({ InvoiceNo: 'NEW', TaxDetailsVersion: 0 });
 const insert = statements.find(({ sql }) => sql.startsWith('INSERT'));
 assert.match(insert.sql, /TaxDetailsVersion\)/);
 assert.match(insert.sql, /, 1\)/);
-console.log('Passed: new invoice mixed taxes/Excel/e-invoice, and legacy invoices retain old rates, aggregate rounding, and workbook layout regardless of invoice date.');
+console.log('Passed: all invoices use current tax details, Excel layout, e-invoice rates and per-line rounding regardless of invoice date or version.');
+
