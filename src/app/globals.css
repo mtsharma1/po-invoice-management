@@ -5683,15 +5683,15 @@ table thead th,
   }
 
   .totals-box {
-    border-top: 1px solid #000 !important;
-    border-left: 1px solid #000 !important;
+    border-top: 1px solid #000;
+    border-left: 1px solid #000;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
   .totals-box > div > * {
-    border-right: 1px solid #000 !important;
-    border-bottom: 1px solid #000 !important;
+    border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
   }
 }
 
@@ -6855,6 +6855,16 @@ table thead th,
 .invoice-main-block > .boxed + .invoice-lines { margin-top: -1px; }
 .invoice-item-tax .invoice-main-block { display: block; border: 1px solid #000; }
 .invoice-item-tax .invoice-main-block > .boxed { border-left: 0; border-right: 0; }
+/* The frame owns outer edges; adjacent sections draw each shared edge once. */
+.invoice-item-tax .invoice-main-block > .boxed + .boxed,
+.invoice-item-tax .invoice-main-block > .boxed + .invoice-lines { margin-top: 0; }
+.invoice-item-tax .invoice-main-block > .boxed + .boxed { border-top: 0; }
+.invoice-item-tax .party-block:nth-last-child(-n + 2) { border-bottom: 0; }
+.invoice-item-tax .invoice-lines thead tr:first-child > * { border-top: 0; }
+.invoice-item-tax .invoice-lines tr > :first-child,
+.invoice-item-tax .invoice-tax-summary tr > :first-child { border-left: 0; }
+.invoice-item-tax .invoice-lines tr > :last-child,
+.invoice-item-tax .totals-box div > :last-child { border-right: 0; }
 .invoice-item-tax .invoice-main-block > .invoice-top-grid { border-top: 0; }
 .invoice-item-tax .invoice-summary { margin-top: 0; padding-bottom: 14px; }
 .invoice-item-tax .invoice-bottom-block { display: block; border: 1px solid #000; margin-top: 14px; }
@@ -6929,7 +6939,7 @@ table thead th,
   .invoice-item-tax .totals-box { width: 34.8387%; }
   .invoice-item-tax .totals-box div { grid-template-columns: 1fr 16.6667% 25.9259%; min-height: 11.5pt; }
   .invoice-item-tax .totals-box div > * { padding: 1pt; }
-  .invoice-item-tax .invoice-bottom-block { margin-top: 0; }
+  .invoice-item-tax .invoice-bottom-block { margin-top: 0; border-top: 0; }
   .invoice-item-tax .words-strip { min-height: 14pt; padding: 3pt 1pt; font-weight: 700; }
   .invoice-item-tax .invoice-footer { grid-template-columns: 65.1613% 34.8387%; gap: 0; padding: 11.5pt 0; min-height: 185pt; }
   .invoice-item-tax .invoice-tax-summary { padding-top: 23pt; }
@@ -6957,3 +6967,38 @@ table thead th,
  .invoice-item-tax .invoice-tax-summary table { table-layout: fixed; }
  .invoice-item-tax .invoice-tax-summary th { line-height: 1.1; }
 }
+/* Joined invoice footer and side-by-side tax reconciliation. */
+.invoice-financial-row { width: 100%; }
+.invoice-item-tax .invoice-financial-row { display: grid; grid-template-columns: minmax(0, 65.1613fr) minmax(0, 34.8387fr); align-items: start; }
+.invoice-item-tax .invoice-financial-row .totals-box { width: 100%; margin: 0; }
+.invoice-item-tax .invoice-financial-row .invoice-tax-summary { padding: 0 14px 0 0; }
+.invoice-item-tax .invoice-footer { grid-template-columns: minmax(0, 65.1613fr) minmax(0, 34.8387fr); gap: 0; padding: 0; min-height: 0; }
+.invoice-item-tax .invoice-note-cell { border-bottom: 1px solid #000; min-width: 0; }
+.invoice-item-tax .invoice-note-cell .invoice-printed-note { width: 100%; height: 100%; border: 0; margin: 0; padding: 8px; }
+.invoice-item-tax .invoice-footer-details { gap: 0; }
+.invoice-item-tax .bank-box { border-top: 0; border-right: 0; }
+.invoice-item-tax .invoice-footer > .signature { grid-column: 2; margin: 14px 0; justify-self: end; }
+.invoice-item-tax .signature strong, .invoice-item-tax .signature span { border: 0; }
+@media print {
+  .invoice-item-tax .invoice-financial-row .invoice-tax-summary { padding: 0 6pt 0 0; }
+  .invoice-item-tax .invoice-note-cell .invoice-printed-note { padding: 3pt; }
+  .invoice-item-tax .invoice-footer > .signature { margin: 8pt 0; min-height: 65pt; }
+}
+.invoice-item-tax .invoice-footer-details { min-height: 0; display: block; }
+.invoice-item-tax .bank-box { height: 100%; display: grid; grid-template-rows: repeat(5, minmax(23px, auto)); }
+.invoice-paper:not(.invoice-item-tax) .invoice-financial-row { display: contents; }
+@media print {
+  .invoice-item-tax .bank-box { grid-template-rows: repeat(5, minmax(11.5pt, auto)); }
+}
+
+/* Align reconciliation with Grand Total and enclose the space above it. */
+.invoice-item-tax .invoice-financial-row { align-items: stretch; border-top: 1px solid #000; }
+.invoice-item-tax .invoice-financial-row .invoice-tax-summary { display: flex; flex-direction: column; justify-content: flex-end; padding: 0; }
+.invoice-item-tax .invoice-financial-row .invoice-tax-summary caption { display: none; }
+.invoice-item-tax .invoice-financial-row .invoice-tax-summary tr > :last-child { border-right: 0; }
+.invoice-item-tax .invoice-financial-row .totals-box { border-top: 0; }
+.invoice-item-tax .quantity-total-row strong,
+.invoice-item-tax .quantity-total-row span { text-align: center; padding: 0; align-self: center; }
+.invoice-item-tax .quantity-total-row strong { grid-column: 7; }
+.invoice-item-tax .invoice-summary { gap: 0; }
+.invoice-item-tax .invoice-bottom-block { margin-top: 0; border-top: 0; }

@@ -9,7 +9,11 @@ async function load(path, dependencies = {}) {
   return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 }
 const { makeEwayBillPdfData, enrichEwayBillPdfData } = await load('src/lib/ewayBillPdfData.js');
-const { buildEwayBillPdf, portalDate } = await load('src/lib/ewayBillPdf.js', Object.fromEntries(['pdfkit', 'qrcode', 'bwip-js'].map(name => [name, pathToFileURL(require.resolve(name)).href])));
+const { buildEwayBillPdf, portalDate, summarizeHsnItems } = await load('src/lib/ewayBillPdf.js', Object.fromEntries(['pdfkit', 'qrcode', 'bwip-js'].map(name => [name, pathToFileURL(require.resolve(name)).href])));
+const groupedArticles = Array.from({ length: 30 }, (_, i) => ({ hsn: '42021250', description: i ? `ARTICLE_${i}` : 'T_TR_INDIA_B1_PA_12' }));
+assert.deepEqual(summarizeHsnItems(groupedArticles), ['42021250 - T_TR_INDIA_B1_PA_12 (+29)']);
+assert.deepEqual(summarizeHsnItems([...groupedArticles, groupedArticles[0], { hsn: '64039990', description: 'T_SH_TEST' }]), ['42021250 - T_TR_INDIA_B1_PA_12 (+29)', '64039990 - T_SH_TEST']);
+assert.deepEqual(summarizeHsnItems([]), []);
 assert.equal(portalDate('2026-10-03 12:49:00', true), '03-10-2026 12:49 PM');
 assert.equal(portalDate('15/09/2026 01:19 PM', true), '15-09-2026 01:19 PM');
 assert.equal(portalDate('2026-10-04 00:05:00', true), '04-10-2026 12:05 AM');
@@ -74,9 +78,11 @@ assert.equal((await failed.json()).error, 'Provider lookup unavailable.');
 delete globalThis.__ewayTest;
 await mkdir('tmp/pdfs', { recursive: true });
 await writeFile('tmp/pdfs/ewaybill-test.pdf', await buildEwayBillPdf(data));
+await writeFile('tmp/pdfs/ewaybill-hsn-summary-test.pdf', await buildEwayBillPdf({ ...data, items: groupedArticles }));
 await writeFile('tmp/pdfs/ewaybill-production-layout-test.pdf', await buildEwayBillPdf({ ...data, environment: 'production' }));
 const enriched = enrichEwayBillPdfData(data, { ewbNo: data.number, docNo: data.invoiceNo, userGstin: '06EXAMPLE0000A1Z0', fromGstin: '06EXAMPLE0000A1Z0', fromTrdName: 'Example Supplier', actualDist: 33, VehiclListDetails: [{ transMode: '1', vehicleNo: 'HR01AB1234', enteredDate: '04/10/2026 10:00:00 AM', userGSTINTransin: '06EXAMPLE0000A1Z0', transDocDate: '04/10/2026' }] });
 await writeFile('tmp/pdfs/ewaybill-details-test.pdf', await buildEwayBillPdf(enriched));
+await writeFile('tmp/pdfs/ewaybill-date-fallback-test.pdf', await buildEwayBillPdf({ ...enriched, vehicleHistory: [{ ...enriched.vehicleHistory[0], vehicle: 'RJ09GD5502', transportDocumentDate: '', vehicleEnteredDate: '03/10/2026 12:49:00 PM' }] }));
 await writeFile('tmp/pdfs/ewaybill-history-test.pdf', await buildEwayBillPdf({ ...enriched, vehicleHistory: Array.from({ length: 35 }, (_, i) => ({ ...enriched.vehicleHistory[0], vehicle: `HR01AB${String(1000+i)}` })) }));
 await writeFile('tmp/pdfs/ewaybill-long-test.pdf', await buildEwayBillPdf({ ...data, items: Array.from({ length: 90 }, (_, i) => ({ hsn: '42021250', description: `Item ${i + 1} - travel suitcase with a long article description` })) }));
 console.log('E-way bill PDF mapping checks passed; normal and multi-page fixtures generated.');

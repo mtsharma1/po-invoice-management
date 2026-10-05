@@ -73,7 +73,10 @@ for (const selected of [0, 1]) {
   assert.equal(sheet.getCell('L19').value.result, 2500);
   let summaryRow;
   sheet.eachRow((row) => { if (row.getCell(1).value === 'Tax Rate') summaryRow = row.number; });
-  assert.ok(summaryRow > 30);
+  assert.equal(sheet.getCell(`H${summaryRow + totals.taxSummary.length}`).value, 'GRAND TOTAL');
+  assert.equal(sheet.getCell('A23').border.top.style, 'thin');
+  assert.equal(sheet.getCell('G22').alignment.horizontal, 'center');
+  assert.equal(sheet.getCell('H22').alignment.vertical, 'middle');
   assert.equal(sheet.getCell(`A${summaryRow + 1}`).value, 5);
   assert.equal(sheet.getCell(`C${summaryRow + 1}`).value.result || 0, selected ? 0 : 125);
   assert.equal(sheet.getCell(`D${summaryRow + 1}`).value.result || 0, selected ? 62.5 : 0);
@@ -85,12 +88,19 @@ for (const selected of [0, 1]) {
     return found;
   };
   const noteCell = cellsWithValue(`Note\n${header.InvoiceNote}`)[0];
-  assert.ok(noteCell.row < summaryRow);
+  assert.ok(noteCell.row > summaryRow);
   assert.equal(noteCell.value.richText[0].font.bold, true);
   assert.equal(Boolean(noteCell.value.richText[1].font.bold), false);
   assert.equal(cellsWithValue('AUTH. SIGN')[0].font.bold, true);
   const beneficiary = cellsWithValue('BENEFICIARY NAME')[0];
   assert.ok(beneficiary);
+  assert.equal(noteCell.row, beneficiary.row);
+  assert.equal(sheet.getCell(`G${beneficiary.row + 4}`).master.address, noteCell.address);
+  for (const label of ['FOR TEAKWOOD', 'AUTH. SIGN']) {
+    const cell = cellsWithValue(label)[0];
+    assert.equal(cell.border?.top?.style, undefined);
+    assert.equal(cell.border?.bottom?.style, undefined);
+  }
   assert.equal(beneficiary.font.bold, true);
   assert.equal(cellsWithValue('GRAND TOTAL')[0].font.bold, true);
   assert.equal(cellsWithValue('FOR TEAKWOOD')[0].font.bold, true);

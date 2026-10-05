@@ -87,6 +87,19 @@ export default function InvoiceView({ invoice }) {
           <strong>TOTAL QTY</strong>
           <span>{qty(totals.totalQty)}</span>
         </div>
+        <div className="invoice-financial-row">
+        {showTaxDetails ? <div className="invoice-tax-summary">
+          <table>
+            <caption>Tax summary</caption>
+            <thead><tr>{['Tax Rate', 'Taxable Amount', 'IGST', 'CGST', 'SGST', 'Total Tax', 'Total Amount'].map((label) => <th key={label}>{label}</th>)}</tr></thead>
+            <tbody>{(totals.taxSummary || []).map((group) => (
+              <tr key={group.taxRate}>
+                <td>{group.taxRate}%</td>
+                {[group.taxableAmount, group.igstAmount, group.cgstAmount, group.sgstAmount, group.totalTax, group.totalAmount].map((amount, index) => <td key={index}>{money(amount)}</td>)}
+              </tr>
+            ))}</tbody>
+          </table>
+        </div> : null}
         <div className="totals-box">
           <div><strong>TAXABLE AMOUNT</strong><span /><span>{money(totals.taxableAmount)}</span></div>
           {totals.isInterState ? (
@@ -100,6 +113,7 @@ export default function InvoiceView({ invoice }) {
           <div><strong>ROUND OFF</strong><span /><span>{money(totals.roundOff)}</span></div>
           <div className="grand-total"><strong>GRAND TOTAL</strong><span /><strong>{money(totals.grandTotal)}</strong></div>
         </div>
+        </div>
         {!showTaxDetails ? <div className="words-strip">{text(header.TotalInWords)}</div> : null}
       </div>
       </div>
@@ -107,19 +121,7 @@ export default function InvoiceView({ invoice }) {
       <div className="invoice-bottom-block">
       {showTaxDetails ? <div className="words-strip">{text(header.TotalInWords)}</div> : null}
       <footer className="invoice-footer">
-        {showTaxDetails ? <div className="invoice-tax-summary">
-          <InvoiceNote value={header.InvoiceNote} />
-          <table>
-            <caption>Tax summary</caption>
-            <thead><tr>{['Tax Rate', 'Taxable Amount', 'IGST', 'CGST', 'SGST', 'Total Tax', 'Total Amount'].map((label) => <th key={label}>{label}</th>)}</tr></thead>
-            <tbody>{(totals.taxSummary || []).map((group) => (
-              <tr key={group.taxRate}>
-                <td>{group.taxRate}%</td>
-                {[group.taxableAmount, group.igstAmount, group.cgstAmount, group.sgstAmount, group.totalTax, group.totalAmount].map((amount, index) => <td key={index}>{money(amount)}</td>)}
-              </tr>
-            ))}</tbody>
-          </table>
-        </div> : <div>{header.InvoiceNote ? <InvoiceNote value={header.InvoiceNote} /> : null}</div>}
+        <div className="invoice-note-cell">{showTaxDetails || header.InvoiceNote ? <InvoiceNote value={header.InvoiceNote} /> : null}</div>
         <div className="invoice-footer-details">
           <div className="bank-box">
             {showTaxDetails ? <div><strong>BENEFICIARY NAME</strong><span>{header.BeneficiaryName || 'TEAKWOOD'}</span></div> : null}
@@ -129,11 +131,9 @@ export default function InvoiceView({ invoice }) {
             <div><strong>Branch</strong><span>{text(header.BranchName)}</span></div>
             {!showTaxDetails ? <div><strong>IFSC CODE</strong><span>{text(header.IFSCCode)}</span></div> : null}
           </div>
-          <div className="signature">
-            <strong>FOR TEAKWOOD</strong>
-            <span><b>AUTH. SIGN</b></span>
-          </div>
+          {!showTaxDetails ? <InvoiceSignature /> : null}
         </div>
+        {showTaxDetails ? <InvoiceSignature /> : null}
       </footer>
       </div>
     </section>
@@ -142,6 +142,10 @@ export default function InvoiceView({ invoice }) {
 
 function InvoiceNote({ value }) {
   return <div className="invoice-printed-note"><strong>Note</strong><div>{value || ''}</div></div>;
+}
+
+function InvoiceSignature() {
+  return <div className="signature"><strong>FOR TEAKWOOD</strong><span><b>AUTH. SIGN</b></span></div>;
 }
 
 function taxRateLabel(rate, showTaxDetails) {

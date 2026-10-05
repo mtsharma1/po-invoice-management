@@ -25,8 +25,10 @@ The provider's optional IRP setting is passed during authentication when configu
 
 Valid From uses the provider's explicit value or the earliest qualifying Part B
 entry, following the NIC validity-start rule. Entered Date/By and transport document
-dates come from each history row. Missing transport document dates are not replaced
-with invoice or entry dates. All returned history rows are printed, with continued
+dates come from each history row. For road vehicles without a transport-document
+date, the PDF displays the vehicle-entry date beside the vehicle number, marked
+with an asterisk and explanatory footnote. The underlying document date remains
+unchanged. All returned history rows are printed, with continued
 table headings on further pages. Cancelled/non-active status is shown above the form.
 
 The reference QR encodes only the e-way bill number; the footnote identifies this

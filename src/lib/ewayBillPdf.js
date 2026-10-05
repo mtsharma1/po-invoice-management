@@ -7,6 +7,19 @@ import path from 'node:path';
 // Dimensions in PDF points, measured from the supplied NIC portal printout.
 const PAGE = [594.96, 841.92];
 const LEFT = 8.25, VALUE_X = 195.75, RIGHT = 587.25;
+export function summarizeHsnItems(items = []) {
+  const groups = new Map();
+  for (const item of items) {
+    const hsn = String(item.hsn ?? '').trim();
+    const article = String(item.description ?? '').trim();
+    if (!groups.has(hsn)) groups.set(hsn, new Set());
+    if (article) groups.get(hsn).add(article);
+  }
+  return Array.from(groups, ([hsn, articles]) => {
+    const first = articles.values().next().value;
+    return `${hsn || '-'}${first ? ` - ${first}` : ''}${articles.size > 1 ? ` (+${articles.size - 1})` : ''}`;
+  });
+}
 function fonts() {
   const windows = process.env.WINDIR || 'C:/Windows';
   return [
@@ -99,15 +112,18 @@ export async function buildEwayBillPdf(data) {
   row('Document No.', data.invoiceNo); row('Document Date', portalDate(data.invoiceDate));
   row('Transaction Type:', data.transaction); row('Value of Goods', data.goodsValue?.replaceAll(',', ''));
   if (!data.items.length) row('HSN Code', '');
-  for (const [index, item] of data.items.entries()) row(index ? '' : 'HSN Code', `${item.hsn}-${item.description}`);
+  for (const summary of summarizeHsnItems(data.items)) row('HSN Code', summary);
   row('Reason for Transportation', data.reason); row('Transporter', data.transporter);
   section('Part - B');
   // NIC uses an outer border and grey top rule, without an internal cell grid.
   const columns = [46.5, 90, 43.5, 96, 123.75, 75, 104.25];
   const headings = ['Mode', 'Vehicle / Trans\nDoc No & Dt.', 'From', 'Entered Date', 'Entered By', 'CEWB No.\n(If any)', 'Multi Veh.Info\n(If any)'];
   const history = Array.isArray(data.vehicleHistory) ? (data.vehicleHistory.length ? data.vehicleHistory : [{}]) : [data];
+  const usesEntryDate = entry => !entry.transportDocumentDate && entry.mode === 'Road' && entry.vehicle && entry.vehicleEnteredDate;
   const rows = history.map(entry => {
-    const details = [entry.mode, [entry.vehicle, entry.transportDocumentNo].filter(Boolean).join('/ ') + (entry.transportDocumentDate ? ` & ${portalDate(entry.transportDocumentDate)}` : ''), entry.vehicleFrom, portalDate(entry.vehicleEnteredDate), entry.vehicleEnteredBy, entry.cewbNo, entry.multiVehicleInfo];
+    const displayedDate = entry.transportDocumentDate || (usesEntryDate(entry) ? entry.vehicleEnteredDate : '');
+    const vehicleDocument = `${entry.vehicle || ''}/${entry.transportDocumentNo || ''}`;
+    const details = [entry.mode, vehicleDocument === '/' ? '' : vehicleDocument + (displayedDate ? ` & ${portalDate(displayedDate)}${usesEntryDate(entry) ? '*' : ''}` : ''), entry.vehicleFrom, portalDate(entry.vehicleEnteredDate), entry.vehicleEnteredBy, entry.cewbNo, entry.multiVehicleInfo];
     font(false, 6.75);
     return { details, height: Math.max(26.25, ...details.map((value, i) => doc.heightOfString(String(value || '-'), { width: columns[i] - 6, lineGap: 0 }) + 8)) };
   });
@@ -139,7 +155,7 @@ export async function buildEwayBillPdf(data) {
   doc.image(barcode, 249, y + 31.31, { width: 97.5, height: 48.27 });
   text(data.number, 249, y + 85.34, 97.5, false, 4.822, { align: 'center' });
   y += 108; rule(y); y += 6;
-  const note = [data.portalDetails ? 'E-way bill details retrieved from WhiteBooks. QR: bill-number reference only, not the official verification QR. "-": not supplied.' : 'Saved-record copy. QR: bill-number reference only, not the official verification QR. "-": not available in saved records.', ...(data.notes || []).filter(value => value.startsWith('Original'))].join(' ');
+  const note = [history.some(usesEntryDate) ? '* Vehicle-entry date shown because the transport-document date was not supplied.' : '', data.portalDetails ? 'E-way bill details retrieved from WhiteBooks. QR: bill-number reference only, not the official verification QR. "-": not supplied.' : 'Saved-record copy. QR: bill-number reference only, not the official verification QR. "-": not available in saved records.', ...(data.notes || []).filter(value => value.startsWith('Original'))].filter(Boolean).join(' ');
   font(false, 5.5); ensure(doc.heightOfString(note, { width: 580 }) + 10);
   text(note, LEFT, y, 580, false, 5.5);
   doc.end();

@@ -74,10 +74,14 @@ export async function buildInvoiceWorkbook({ header, lines, totals }) {
   const totalsLayout = writeTotals(ws, totalsStart, totals, header, firstLineRow, lastLineRow);
   const signatureEnd = totalsLayout.footerStart + Math.max(12, 9 + totals.taxSummary.length);
   writeFooter(ws, totalsLayout.footerStart, header, signatureEnd);
-  writeTaxSummary(ws, totalsLayout.footerStart + 7, totals, firstLineRow, lastLineRow);
+  const summaryStart = totalsLayout.grandRow - totals.taxSummary.length;
+  if (summaryStart > totalsStart + 1) {
+    mergeValue(ws, `A${totalsStart + 1}:G${summaryStart - 1}`, '', 'left');
+  }
+  writeTaxSummary(ws, summaryStart, totals, firstLineRow, lastLineRow);
 
   const printLastRow = signatureEnd + 1;
-  outline(ws, 1, totalsLayout.grandRow + 1);
+  outline(ws, 1, totalsLayout.wordsRow - 1);
   outline(ws, totalsLayout.wordsRow, printLastRow);
   ws.pageSetup.printArea = `A1:L${printLastRow}`;
   ws.pageSetup.printTitlesRow = `${itemHeaderRow}:${itemHeaderRow}`;
@@ -214,7 +218,7 @@ function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
   const lastTaxRow = firstTaxRow + taxRowCount - 1;
   const roundRow = lastTaxRow + 1;
   const grandRow = roundRow + 1;
-  const wordsRow = grandRow + 2;
+  const wordsRow = Math.max(grandRow, taxableRow + totals.taxSummary.length) + 2;
 
   ws.getCell(`G${startRow}`).value = 'TOTAL QTY';
   ws.getCell(`G${startRow}`).font = bold();
@@ -224,6 +228,9 @@ function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
   };
   ws.getCell(`H${startRow}`).numFmt = '#,##0';
   ws.getCell(`H${startRow}`).font = bold();
+  for (const column of ['G', 'H']) {
+    ws.getCell(`${column}${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  }
 
   setFormulaTotalLine(ws, taxableRow, 'TAXABLE AMOUNT', `SUM(L${firstLineRow}:L${lastLineRow})`, totals.taxableAmount);
   if (totals.isInterState) {
@@ -245,7 +252,7 @@ function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
   ws.getCell(`A${wordsRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F3F5' } };
   ws.getRow(wordsRow).height = 22;
 
-  return { footerStart: wordsRow + 2, wordsRow, grandRow };
+  return { footerStart: wordsRow + 1, wordsRow, grandRow };
 }
 
 function setFormulaTotalLine(ws, rowNumber, label, formula, result, emphasize = false) {
@@ -335,18 +342,18 @@ function writeFooter(ws, startRow, header, signatureEnd) {
     ws.getCell(`J${row}`).numFmt = '@';
   });
   box(ws, `H${startRow}:L${startRow + 4}`, borderThin);
-  const noteRow = startRow + 2;
+  const noteRow = startRow;
   const note = 'Note\n' + text(header.InvoiceNote);
-  mergeValue(ws, `A${noteRow}:D${noteRow + 2}`, note, 'left', false);
+  mergeValue(ws, `A${noteRow}:G${noteRow + 4}`, note, 'left', false);
   ws.getCell(`A${noteRow}`).value = { richText: [
     { text: 'Note', font: { name: 'Arial', size: 8, bold: true } },
     { text: '\n' + text(header.InvoiceNote), font: { name: 'Arial', size: 8, bold: false } },
   ] };
   ws.getCell(`A${noteRow}`).alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
   const noteLines = note.split('\n').reduce((count, line) => count + Math.max(1, Math.ceil(line.length / 48)), 0);
-  for (let row = noteRow; row <= noteRow + 2; row += 1) ws.getRow(row).height = Math.max(18, Math.ceil(noteLines * 12 / 3));
-  mergeValue(ws, `J${startRow + 6}:L${startRow + 6}`, 'FOR TEAKWOOD', 'center', true);
-  mergeValue(ws, `J${signatureEnd}:L${signatureEnd}`, 'AUTH. SIGN', 'center', true);
+  for (let row = noteRow; row <= noteRow + 4; row += 1) ws.getRow(row).height = Math.max(18, Math.ceil(noteLines * 12 / 5));
+  mergeValue(ws, `J${startRow + 6}:L${startRow + 6}`, 'FOR TEAKWOOD', 'center', true, 8, false);
+  mergeValue(ws, `J${signatureEnd}:L${signatureEnd}`, 'AUTH. SIGN', 'center', true, 8, false);
 
 }
 
