@@ -9,7 +9,7 @@ async function load(path, dependencies = {}) {
   return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 }
 const { makeEwayBillPdfData, enrichEwayBillPdfData } = await load('src/lib/ewayBillPdfData.js');
-const { buildEwayBillPdf, portalDate, summarizeHsnItems } = await load('src/lib/ewayBillPdf.js', Object.fromEntries(['pdfkit', 'qrcode', 'bwip-js'].map(name => [name, pathToFileURL(require.resolve(name)).href])));
+const { buildEwayBillPdf, portalDate, summarizeHsnItems, ewayBillQrPayload } = await load('src/lib/ewayBillPdf.js', Object.fromEntries(['pdfkit', 'qrcode', 'bwip-js'].map(name => [name, pathToFileURL(require.resolve(name)).href])));
 const groupedArticles = Array.from({ length: 30 }, (_, i) => ({ hsn: '42021250', description: i ? `ARTICLE_${i}` : 'T_TR_INDIA_B1_PA_12' }));
 assert.deepEqual(summarizeHsnItems(groupedArticles), ['42021250 - T_TR_INDIA_B1_PA_12 (+29)']);
 assert.deepEqual(summarizeHsnItems([...groupedArticles, groupedArticles[0], { hsn: '64039990', description: 'T_SH_TEST' }]), ['42021250 - T_TR_INDIA_B1_PA_12 (+29)', '64039990 - T_SH_TEST']);
@@ -86,3 +86,9 @@ await writeFile('tmp/pdfs/ewaybill-date-fallback-test.pdf', await buildEwayBillP
 await writeFile('tmp/pdfs/ewaybill-history-test.pdf', await buildEwayBillPdf({ ...enriched, vehicleHistory: Array.from({ length: 35 }, (_, i) => ({ ...enriched.vehicleHistory[0], vehicle: `HR01AB${String(1000+i)}` })) }));
 await writeFile('tmp/pdfs/ewaybill-long-test.pdf', await buildEwayBillPdf({ ...data, items: Array.from({ length: 90 }, (_, i) => ({ hsn: '42021250', description: `Item ${i + 1} - travel suitcase with a long article description` })) }));
 console.log('E-way bill PDF mapping checks passed; normal and multi-page fixtures generated.');
+const qrExample = { number: '302334427543', generatedBy: '06BMTPS4959L1ZX TEAKWOOD', generated: '15/09/2026 01:19 PM' };
+assert.equal(ewayBillQrPayload(qrExample), '302334427543/06BMTPS4959L1ZX/2026-09-15 13:19:00');
+assert.equal(ewayBillQrPayload({ ...qrExample, generated: '2026-09-15 13:19:00' }), '302334427543/06BMTPS4959L1ZX/2026-09-15 13:19:00');
+assert.equal(ewayBillQrPayload({ ...qrExample, generated: '15-09-2026 12:05:03 AM' }), '302334427543/06BMTPS4959L1ZX/2026-09-15 00:05:03');
+assert.equal(ewayBillQrPayload({ ...qrExample, generatedBy: '', supplier: '06BMTPS4959L1ZX\nTEAKWOOD' }), '302334427543/06BMTPS4959L1ZX/2026-09-15 13:19:00');
+assert.equal(ewayBillQrPayload({ ...qrExample, generated: '' }), '');
