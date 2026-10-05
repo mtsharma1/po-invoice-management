@@ -1,5 +1,7 @@
 import { query, withTransaction } from './db';
 import { getWebSettings } from './settings';
+import { ensureInvoiceTaxVersionColumn } from './invoiceTaxSchema';
+import { ensureInvoicePresentationColumns } from './invoicePresentationSchema';
 
 const defaultBankDetails = {
   AccountNo: '6811361613',
@@ -27,6 +29,8 @@ const invoiceFields = [
   'BuyerAddress',
   'BuyerGSTIN',
   'AccountNo',
+  'BeneficiaryName',
+  'InvoiceNote',
   'BankName',
   'BranchName',
   'IFSCCode',
@@ -102,6 +106,8 @@ export async function saveCustomerInvoice(payload) {
   const invoiceId = Number(payload?.InvoiceID || 0);
   const invoice = applyDefaultBankDetails(payload);
   const savedBankDetails = pickBankDetails(invoice);
+  await ensureInvoiceTaxVersionColumn();
+  await ensureInvoicePresentationColumns();
   return withTransaction(async (run) => {
     const duplicateRows = await run(
       `SELECT InvoiceID
@@ -124,8 +130,8 @@ export async function saveCustomerInvoice(payload) {
 
     const placeholders = invoiceFields.map(() => '?').join(', ');
     const result = await run(
-      `INSERT INTO tblInvoiceHeader (${invoiceFields.join(', ')})
-       VALUES (${placeholders})`,
+      `INSERT INTO tblInvoiceHeader (${invoiceFields.join(', ')}, TaxDetailsVersion)
+       VALUES (${placeholders}, 1)`,
       values
     );
     return { invoiceId: result.insertId, invoiceNo, bankDetails: savedBankDetails, message: 'Invoice created successfully.' };
@@ -157,6 +163,8 @@ function blankInvoice(settings) {
     BranchName: defaultIfBlank(settings.branchName, defaultBankDetails.BranchName),
     IFSCCode: defaultIfBlank(settings.ifscCode, defaultBankDetails.IFSCCode),
     TotalInWords: '',
+    InvoiceNote: '',
+    BeneficiaryName: 'TEAKWOOD',
     POBarcode: '',
     SealNo: '',
     OrderNumber: '',
@@ -171,6 +179,8 @@ function blankInvoice(settings) {
 function applyDefaultBankDetails(invoice = {}) {
   return {
     ...invoice,
+    InvoiceNote: invoice.InvoiceNote ?? '',
+    BeneficiaryName: defaultIfBlank(invoice.BeneficiaryName, 'TEAKWOOD'),
     AccountNo: defaultIfBlank(invoice.AccountNo, defaultBankDetails.AccountNo),
     BankName: defaultIfBlank(invoice.BankName, defaultBankDetails.BankName),
     BranchName: defaultIfBlank(invoice.BranchName, defaultBankDetails.BranchName),
@@ -180,6 +190,7 @@ function applyDefaultBankDetails(invoice = {}) {
 
 function pickBankDetails(invoice) {
   return {
+    BeneficiaryName: invoice.BeneficiaryName,
     AccountNo: invoice.AccountNo,
     BankName: invoice.BankName,
     BranchName: invoice.BranchName,

@@ -6,7 +6,7 @@ const nextConfig = {
   },
   // Keep large Node-only libraries out of Turbopack's server graph. Bundling
   // ExcelJS made the development cache grow close to 1 GB.
-  serverExternalPackages: ['mysql2', 'exceljs'],
+  serverExternalPackages: ['mysql2', 'exceljs', 'pdfkit', 'bwip-js'],
 };
 
 module.exports = nextConfig;

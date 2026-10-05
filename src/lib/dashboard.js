@@ -26,13 +26,15 @@ const categoryExpression = `
       THEN 'BackPack'
     WHEN LOWER(REPLACE(REPLACE(REPLACE(TRIM(COALESCE(p.Category, '')), ' ', ''), '-', ''), '_', '')) = 'smallhardcase'
       THEN 'Small Hard Case'
+    WHEN LOWER(REPLACE(REPLACE(REPLACE(TRIM(COALESCE(p.Category, '')), ' ', ''), '-', ''), '_', '')) = 'gurgaonslg'
+      THEN 'Gurgaon SLG'
     WHEN NULLIF(TRIM(p.Category), '') IS NOT NULL THEN TRIM(p.Category)
     WHEN LEFT(COALESCE(p.VendorArticleName, ''), 4) = 'T_TR' THEN 'SuitCase'
     ELSE 'BackPack'
   END
 `;
 
-const standardCategories = ['SuitCase', 'BackPack', 'Small Hard Case'];
+const standardCategories = ['SuitCase', 'BackPack', 'Small Hard Case', 'Gurgaon SLG'];
 
 export async function getDashboardStats() {
   const period = previousDashboardMonth();

@@ -2,6 +2,7 @@ import { query, withTransaction } from './db';
 import { getShellOrderContext, listPOBarcodes } from './shellOrders';
 import { getWebSettings } from './settings';
 import { ensurePOConsigneeNameColumn } from './poSchema';
+import { ensureInvoiceTaxVersionColumn } from './invoiceTaxSchema';
 
 const defaultInvoiceBankDetails = {
   accountNo: '6811361613',
@@ -311,6 +312,7 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
   if (!invoiceNo) throw new Error('Please enter an invoice number before posting the entry.');
 
   await ensurePOConsigneeNameColumn();
+  await ensureInvoiceTaxVersionColumn();
 
   const settings = await getWebSettings();
   const bankDetails = {
@@ -394,8 +396,8 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
          (POBarcode, InvoiceNo, GSTN,
           BillFromName, BillFromAddress, DispatchFromName, DispatchFromAddress,
           ConsigneeName, ConsigneeAddress, DeliveredToName, DeliveredToAddress,
-          AccountNo, BankName, BranchName, IFSCCode)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          AccountNo, BankName, BranchName, IFSCCode, TaxDetailsVersion)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         poBarcode,
         invoiceNo,

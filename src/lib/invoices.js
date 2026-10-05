@@ -1,6 +1,7 @@
 import { query } from './db';
 import { asNumber } from './format';
 import { amountInWords } from './numberWords';
+import { invoiceTaxSummary, lineTaxRates, usesItemTaxDetails } from './invoiceTax';
 
 const preferredHeaderSql = `
   SELECT h.*
@@ -118,12 +119,67 @@ export async function getInvoice(invoiceNo) {
         ? storedTotalInWords
         : amountInWords(totals.grandTotal),
     },
-    lines,
+    lines: usesItemTaxDetails(header) ? lines.map((line) => ({ ...line, TaxRate: lineTaxRates(header, line).taxRate })) : lines,
     totals,
   };
 }
 
 export function calculateInvoiceTotals(header, lines) {
+  if (!usesItemTaxDetails(header)) return calculateLegacyInvoiceTotals(header, lines);
+  const totalQty = lines.reduce((sum, line) => sum + asNumber(line.Qty), 0);
+  const taxSummary = invoiceTaxSummary(header, lines);
+  const sum = (field) => roundMoney(taxSummary.reduce((total, group) => total + group[field], 0));
+  const taxableAmount = sum('taxableAmount');
+  const isInterState = asNumber(header?.InterStateTax) !== 0;
+  const commonRate = (field) => taxSummary.length === 1 ? taxSummary[0][field] : null;
+  const igstRate = commonRate('igstRate');
+  const sgstRate = commonRate('sgstRate');
+  const cgstRate = commonRate('cgstRate');
+  const igstAmount = sum('igstAmount');
+  const sgstAmount = sum('sgstAmount');
+  const cgstAmount = sum('cgstAmount');
+  const rawGrandTotal = taxableAmount + igstAmount + sgstAmount + cgstAmount;
+  const grandTotal = Math.round(rawGrandTotal);
+  const roundOff = roundMoney(grandTotal - rawGrandTotal);
+
+  return {
+    taxSummary,
+    totalQty,
+    taxableAmount,
+    isInterState,
+    igstRate,
+    igstAmount,
+    sgstRate,
+    sgstAmount,
+    cgstRate,
+    cgstAmount,
+    roundOff,
+    grandTotal,
+  };
+}
+
+function roundMoney(value) {
+  return Math.round((asNumber(value) + Number.EPSILON) * 100) / 100;
+}
+
+function emptyTotals() {
+  return {
+    taxSummary: [],
+    totalQty: 0,
+    taxableAmount: 0,
+    isInterState: false,
+    igstRate: 0,
+    igstAmount: 0,
+    sgstRate: 0,
+    sgstAmount: 0,
+    cgstRate: 0,
+    cgstAmount: 0,
+    roundOff: 0,
+    grandTotal: 0,
+  };
+}
+
+function calculateLegacyInvoiceTotals(header, lines) {
   const totalQty = lines.reduce((sum, line) => sum + asNumber(line.Qty), 0);
   const taxableAmount = lines.reduce((sum, line) => sum + asNumber(line.Amount), 0);
   const isInterState = asNumber(header?.InterStateTax) !== 0;
@@ -152,27 +208,8 @@ export function calculateInvoiceTotals(header, lines) {
   };
 }
 
-function roundMoney(value) {
-  return Math.round((asNumber(value) + Number.EPSILON) * 100) / 100;
-}
 
 function positiveRate(value, fallback) {
   const rate = asNumber(value);
   return rate > 0 ? rate : fallback;
-}
-
-function emptyTotals() {
-  return {
-    totalQty: 0,
-    taxableAmount: 0,
-    isInterState: false,
-    igstRate: 0,
-    igstAmount: 0,
-    sgstRate: 0,
-    sgstAmount: 0,
-    cgstRate: 0,
-    cgstAmount: 0,
-    roundOff: 0,
-    grandTotal: 0,
-  };
 }

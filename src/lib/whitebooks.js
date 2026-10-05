@@ -24,6 +24,49 @@ export function getEInvoiceConfig(environment = getEInvoiceEnvironment()) {
 
 export class WhitebooksError extends Error {}
 
+// Read-only full EWB lookup. This wrapper uses the documented GSP headers,
+// not an e-invoice auth-token. Never call generation to fill missing PDF fields.
+export async function getWhitebooksEwayBillDetails(ewbNo, environment = getEwayBillEnvironment()) {
+  if (!/^\d{12}$/.test(String(ewbNo))) throw new WhitebooksError('A valid e-way bill number is required.');
+  const config = getEwayBillConfig(environment);
+  const shared = getEInvoiceConfig(environment).values;
+  const values = { ...config.values };
+  // Email, IP and taxpayer identity are shared account metadata. API keys stay
+  // together: use the dedicated EWB pair when supplied, otherwise the shared pair.
+  for (const key of ['email', 'ip_address', 'gstin']) values[key] ||= shared[key];
+  if (!values.client_id && !values.client_secret) {
+    values.client_id = shared.client_id; values.client_secret = shared.client_secret;
+  }
+  const keys = ['ip_address', 'client_id', 'client_secret', 'gstin'];
+  if (['email', ...keys].some(key => !values[key]?.trim())) throw new WhitebooksError('Configure the e-way bill API email, IP, GSTIN and API keys to download complete bill details.');
+  if (!values.username?.trim() || !values.password?.trim()) throw new WhitebooksError('Configure the e-way bill API username and password to download complete bill details.');
+  const url = new URL('/ewaybillapi/v1.03/ewayapi/getewaybill', config.baseUrl);
+  url.searchParams.set('email', values.email.trim()); url.searchParams.set('ewbNo', String(ewbNo));
+  let payload;
+  try {
+    const authUrl = new URL('/ewaybillapi/v1.03/authenticate', config.baseUrl);
+    for (const key of ['email', 'username', 'password']) authUrl.searchParams.set(key, values[key].trim());
+    if (config.irp) authUrl.searchParams.set('irp', config.irp);
+    const headers = Object.fromEntries(keys.map(key => [key, values[key]]));
+    const authResponse = await fetch(authUrl, { method: 'GET', headers, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000) });
+    if (!authResponse.ok) throw new Error('Authentication failed');
+    const auth = await authResponse.json();
+    if (!['1', 'success', 'sucess'].includes(String(auth?.status_cd ?? auth?.status).toLowerCase())) throw new Error('Authentication failed');
+    const response = await fetch(url, { method: 'GET', headers: Object.fromEntries(keys.map(key => [key, values[key]])), cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000) });
+    if (!response.ok) throw new Error('Lookup failed');
+    payload = await response.json();
+  } catch { throw new WhitebooksError('Unable to retrieve full e-way bill details from WhiteBooks. Check the e-way bill API credentials and retry. No bill was changed.'); }
+  const data = payload?.data;
+  if (!['1', 'success', 'sucess'].includes(String(payload?.status_cd ?? payload?.status).toLowerCase()) || !data || String(data.ewbNo ?? data.ewayBillNo) !== String(ewbNo)) {
+    throw new WhitebooksError('WhiteBooks did not return matching full e-way bill details. Check e-way bill API access and retry. No bill was changed.');
+  }
+  // Allowlist: never carry credentials or provider headers into the PDF model.
+  const fields = ['ewbNo', 'ewayBillNo', 'ewayBillDate', 'userGstin', 'fromGstin', 'fromTrdName', 'toGstin', 'toTrdName', 'transporterId', 'transporterName', 'docNo', 'validFrom', 'validUpto', 'actualDist', 'status'];
+  const result = Object.fromEntries(fields.filter(key => ['string', 'number'].includes(typeof data[key])).map(key => [key, data[key]]));
+  if (Array.isArray(data.VehiclListDetails)) result.VehiclListDetails = data.VehiclListDetails.map(row => Object.fromEntries(['vehicleNo', 'fromPlace', 'fromState', 'tripshtNo', 'userGSTINTransin', 'enteredDate', 'transMode', 'transDocNo', 'transDocDate', 'groupNo'].filter(key => ['string', 'number'].includes(typeof row?.[key])).map(key => [key, row[key]])));
+  return result;
+}
+
 export async function generateWhitebooksIrn(document, authToken, environment = getEInvoiceEnvironment()) {
   const { baseUrl, values } = getEInvoiceConfig(environment);
   const url = new URL('/einvoice/type/GENERATE/version/V1_03', baseUrl);

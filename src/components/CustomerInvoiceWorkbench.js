@@ -231,12 +231,20 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
           <div className="bank-panel">
             <div className="bank-title">BANK DETAILS</div>
             <div className="bank-grid">
+              <FormInput label="Beneficiary Name" value={form.BeneficiaryName || ''} onChange={(value) => updateField('BeneficiaryName', value)} />
               <FormInput label="Account No." value={form.AccountNo} onChange={(value) => updateField('AccountNo', value)} />
+              <FormInput label="IFSC Code" value={form.IFSCCode} onChange={(value) => updateField('IFSCCode', value)} />
               <FormInput label="Bank Name" value={form.BankName} onChange={(value) => updateField('BankName', value)} />
               <FormInput label="Branch Name" value={form.BranchName} onChange={(value) => updateField('BranchName', value)} />
-              <FormInput label="IFSC Code" value={form.IFSCCode} onChange={(value) => updateField('IFSCCode', value)} />
             </div>
           </div>
+
+          <label className="invoice-note-editor">
+            <strong>Note</strong>
+            <textarea rows={4} value={form.InvoiceNote || ''}
+              onChange={(event) => updateField('InvoiceNote', event.target.value)}
+              placeholder="Enter a note to print on this invoice above the tax summary" />
+          </label>
 
           <div className="invoice-action-bar">
             <button className="invoice-new-button" type="button" onClick={addNew}><ActionIcon name="plus" /> New invoice</button>

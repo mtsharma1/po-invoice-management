@@ -248,6 +248,8 @@ CREATE TABLE IF NOT EXISTS tblInvoiceHeader (
   RoundOff DECIMAL(18,2) NULL,
   GrandTotal DECIMAL(18,2) NULL,
   TotalInWords TEXT NULL,
+  InvoiceNote TEXT NULL,
+  BeneficiaryName VARCHAR(255) NULL,
   POBarcode VARCHAR(255) NULL,
   SealNo VARCHAR(100) NULL,
   OrderNumber VARCHAR(100) NULL,

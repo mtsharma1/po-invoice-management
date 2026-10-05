@@ -1,5 +1,6 @@
 import { getInvoice, listInvoices } from './invoices';
 import { getEwayBillTransport } from './ewayBillTransport';
+import { lineTaxRates, usesItemTaxDetails } from './invoiceTax';
 
 export const SUPPLY_TYPES = Object.freeze([
   { value: 'B2B', label: 'B2B — Business to business' },
@@ -193,12 +194,13 @@ function buildDocument(invoice, draft) {
   const seller = normalizedParty(draft.seller);
   const buyer = normalizedParty(draft.buyer);
   const supTyp = clean(draft.tran.SupTyp).toUpperCase();
-  const gstRate = invoiceGstRate(invoice.header);
   const withoutPayment = WITHOUT_PAYMENT_TYPES.has(supTyp);
   const useIgst = WITH_PAYMENT_TYPES.has(supTyp)
     || (!withoutPayment && (seller.Stcd !== clean(draft.buyer.Pos) || clean(draft.tran.IgstOnIntra).toUpperCase() === 'Y'));
   const includeFreeQuantity = draft.outputOptions?.includeFreeQuantity !== false;
-  const itemList = invoice.lines.map((line, index) => buildItem(line, index, gstRate, useIgst, withoutPayment, includeFreeQuantity));
+  const itemList = invoice.lines.map((line, index) => buildItem(line, index,
+    usesItemTaxDetails(invoice.header) ? lineTaxRates(invoice.header, line).taxRate : invoiceGstRate(invoice.header),
+    useIgst, withoutPayment, includeFreeQuantity));
   const assVal = sumMoney(itemList, 'AssAmt');
   const igstVal = sumMoney(itemList, 'IgstAmt');
   const cgstVal = sumMoney(itemList, 'CgstAmt');
@@ -440,7 +442,6 @@ function validateExport(details, required, add) {
 }
 
 function validateEwayBill(details, add) {
-  if (!details.TransId && !details.TransName) add('E-Way Bill', 'TRANSPORTER', 'Enter a transporter ID or transporter name.');
   if (details.TransId && !/^[0-9A-Z]{15}$/.test(details.TransId)) add('E-Way Bill', 'TRANSPORTER_ID', 'Transporter ID must contain 15 letters/numbers.');
   if (!Number.isInteger(details.Distance) || details.Distance < 0 || details.Distance > 4000) add('E-Way Bill', 'DISTANCE', 'Distance must be a whole number from 0 to 4,000 km.');
   if (!TRANSPORT_MODES.has(details.TransMode)) add('E-Way Bill', 'MODE', 'Transport mode must be Road, Rail, Air or Ship.');
