@@ -44,14 +44,26 @@ export function portalDate(value, time = false) {
   const hour = Number(clock[1]);
   return `${formatted} ${String(hour % 12 || 12).padStart(2, '0')}:${clock[2]} ${clock[3]?.toUpperCase() || (hour >= 12 ? 'PM' : 'AM')}`;
 }
+export function ewayBillQrPayload(data) {
+  const gstin = String(data.generatedBy || '').match(/\b[0-9A-Z]{15}\b/i)?.[0]
+    || String(data.supplier || '').match(/\b[0-9A-Z]{15}\b/i)?.[0];
+  const raw = String(data.generated || '').trim();
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2}|\d{2}[/-]\d{2}[/-]\d{4})[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (!gstin || !match) return '';
+  const [, date, hours, minutes, seconds = '00', period] = match;
+  const isoDate = date.length === 10 && date[4] === '-' ? date : date.split(/[/-]/).reverse().join('-');
+  const hour = period ? Number(hours) % 12 + (period.toUpperCase() === 'PM' ? 12 : 0) : Number(hours);
+  return `${data.number}/${gstin.toUpperCase()}/${isoDate} ${String(hour).padStart(2, '0')}:${minutes}:${seconds}`;
+}
 export async function buildEwayBillPdf(data) {
+  const qrPayload = ewayBillQrPayload(data);
   const [qr, barcode] = await Promise.all([
-    QRCode.toBuffer(data.number, { margin: 0, width: 510 }),
+    qrPayload ? QRCode.toBuffer(qrPayload, { margin: 0, width: 510 }) : null,
     bwipjs.toBuffer({ bcid: 'code128', text: data.number, scale: 4, height: 18, includetext: false, padding: 0 }),
   ]);
   const doc = new PDFDocument({ size: PAGE, margin: 0, bufferPages: true, info: {
     Title: `e-Way Bill ${data.number}`, Author: 'TEAKWOOD',
-    Subject: 'Saved-record copy. Reference QR encodes the bill number, not the portal verification payload.',
+    Subject: 'E-way bill QR: bill number/GSTIN/generation date and time.',
   } });
   const [regular, bold] = fonts();
   doc.registerFont('Portal', regular); doc.registerFont('PortalBold', bold);
@@ -96,7 +108,7 @@ export async function buildEwayBillPdf(data) {
     y += height;
   }
   text('e-Way Bill', 0, 27.67, PAGE[0], true, 15, { align: 'center' });
-  doc.image(qr, 234, 48.75, { width: 127.5, height: 127.5 });
+  if (qr) doc.image(qr, 234, 48.75, { width: 127.5, height: 127.5 });
   if (data.environment === 'sandbox') text('SANDBOX / TEST - NOT FOR TRANSPORT', LEFT, 180, RIGHT - LEFT, true, 8, { align: 'center' });
   else if (data.status && data.status !== 'ACT') text(`PORTAL STATUS: ${data.status}`, LEFT, 180, RIGHT - LEFT, true, 8, { align: 'center' });
   row('E-Way Bill No:', data.number, 13.5, 20.25);
@@ -155,9 +167,10 @@ export async function buildEwayBillPdf(data) {
   doc.image(barcode, 249, y + 31.31, { width: 97.5, height: 48.27 });
   text(data.number, 249, y + 85.34, 97.5, false, 4.822, { align: 'center' });
   y += 108; rule(y); y += 6;
-  const note = [history.some(usesEntryDate) ? '* Vehicle-entry date shown because the transport-document date was not supplied.' : '', data.portalDetails ? 'E-way bill details retrieved from WhiteBooks. QR: bill-number reference only, not the official verification QR. "-": not supplied.' : 'Saved-record copy. QR: bill-number reference only, not the official verification QR. "-": not available in saved records.', ...(data.notes || []).filter(value => value.startsWith('Original'))].filter(Boolean).join(' ');
+  const note = [!qrPayload ? 'QR unavailable: GSTIN or generation timestamp missing.' : '', history.some(usesEntryDate) ? '* Vehicle-entry date shown because the transport-document date was not supplied.' : '', data.portalDetails ? 'E-way bill details retrieved from WhiteBooks. QR: bill number/GSTIN/generation timestamp. "-": not supplied.' : 'Saved-record copy. QR: bill number/GSTIN/generation timestamp. "-": not available in saved records.', ...(data.notes || []).filter(value => value.startsWith('Original'))].filter(Boolean).join(' ');
   font(false, 5.5); ensure(doc.heightOfString(note, { width: 580 }) + 10);
   text(note, LEFT, y, 580, false, 5.5);
   doc.end();
   return result;
 }
+

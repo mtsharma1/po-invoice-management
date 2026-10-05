@@ -87,7 +87,7 @@ export function makeEwayBillPdfData({ environment, submission, irnRecord, invoic
     ? document.DispDtls ? (document.ShipDtls ? 4 : 3) : document.ShipDtls ? 2 : 1 : 0;
   const notes = [
     'Saved-record copy, not a live portal status check. Vehicle updates, validity extensions, cancellation status and CEWB/multi-vehicle history are not available in the saved response.',
-    'QR and barcode encode the e-way bill number only; they are not the official portal verification QR.',
+    'QR encodes bill number/GSTIN/generation timestamp; barcode encodes the bill number.',
   ];
   if (!snapshot) notes.push('Original e-invoice request unavailable: party, goods and invoice details use the current saved invoice.');
   if (!hasTransportSnapshot) notes.push('Original transport request unavailable: transport fields use the saved transport form and may differ from the issued bill.');
@@ -123,3 +123,4 @@ export function makeEwayBillPdfData({ environment, submission, irnRecord, invoic
     items, notes,
   };
 }
+

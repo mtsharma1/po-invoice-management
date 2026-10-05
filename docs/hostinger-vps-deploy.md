@@ -38,10 +38,38 @@ APP_SESSION_SECRET=long-random-secret
 
 ```bash
 cd /var/www/teakwood-web
-npm install
+npm ci
 npm run build
 pm2 start npm --name teakwood-web -- start
 pm2 save
+```
+
+### Updating an existing deployment
+
+Run from the application's existing production directory:
+
+```bash
+git pull --ff-only && npm ci && npm run build
+```
+
+Only after the build succeeds, restart the application's PM2 process:
+
+```bash
+pm2 restart teakwood-web
+```
+
+If your process uses a different name, find it with `pm2 list` and use that name.
+Keep the existing port and environment configuration.
+
+`git pull` does not install dependencies. The e-way bill PDF feature requires
+`pdfkit`, `bwip-js`, and `qrcode`; these are already declared in `package.json`
+and `package-lock.json`. Run `npm ci` after pulling to install the locked versions
+before building. Do not copy Windows `node_modules` to the Linux server.
+
+For a `Module not found` error, verify the install with:
+
+```bash
+npm ls pdfkit bwip-js qrcode --depth=0
 ```
 
 ## 5. Nginx Reverse Proxy
