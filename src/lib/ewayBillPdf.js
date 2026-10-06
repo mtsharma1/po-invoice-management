@@ -135,7 +135,7 @@ export async function buildEwayBillPdf(data) {
   const rows = history.map(entry => {
     const displayedDate = entry.transportDocumentDate || (usesEntryDate(entry) ? entry.vehicleEnteredDate : '');
     const vehicleDocument = `${entry.vehicle || ''}/${entry.transportDocumentNo || ''}`;
-    const details = [entry.mode, vehicleDocument === '/' ? '' : vehicleDocument + (displayedDate ? ` & ${portalDate(displayedDate)}${usesEntryDate(entry) ? '*' : ''}` : ''), entry.vehicleFrom, portalDate(entry.vehicleEnteredDate), entry.vehicleEnteredBy, entry.cewbNo, entry.multiVehicleInfo];
+    const details = [entry.mode, vehicleDocument === '/' ? '' : vehicleDocument + (displayedDate ? ` & ${portalDate(displayedDate)}` : ''), entry.vehicleFrom, portalDate(entry.vehicleEnteredDate), entry.vehicleEnteredBy, entry.cewbNo, entry.multiVehicleInfo];
     font(false, 6.75);
     return { details, height: Math.max(26.25, ...details.map((value, i) => doc.heightOfString(String(value || '-'), { width: columns[i] - 6, lineGap: 0 }) + 8)) };
   });
@@ -167,10 +167,8 @@ export async function buildEwayBillPdf(data) {
   doc.image(barcode, 249, y + 31.31, { width: 97.5, height: 48.27 });
   text(data.number, 249, y + 85.34, 97.5, false, 4.822, { align: 'center' });
   y += 108; rule(y); y += 6;
-  const note = [!qrPayload ? 'QR unavailable: GSTIN or generation timestamp missing.' : '', history.some(usesEntryDate) ? '* Vehicle-entry date shown because the transport-document date was not supplied.' : '', data.portalDetails ? 'E-way bill details retrieved from WhiteBooks. QR: bill number/GSTIN/generation timestamp. "-": not supplied.' : 'Saved-record copy. QR: bill number/GSTIN/generation timestamp. "-": not available in saved records.', ...(data.notes || []).filter(value => value.startsWith('Original'))].filter(Boolean).join(' ');
-  font(false, 5.5); ensure(doc.heightOfString(note, { width: 580 }) + 10);
-  text(note, LEFT, y, 580, false, 5.5);
   doc.end();
   return result;
 }
+
 
