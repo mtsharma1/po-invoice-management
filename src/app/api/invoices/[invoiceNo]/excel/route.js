@@ -1,5 +1,6 @@
 import { getInvoice } from '@/lib/invoices';
 import { buildInvoiceWorkbook } from '@/lib/excelInvoice';
+import { getEwayBill } from '@/lib/whitebooksEwayBill';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,9 @@ export async function GET(_request, { params }) {
     return Response.json({ error: 'Invoice not found' }, { status: 404 });
   }
 
+  // Invoice exports must never include sandbox/test e-way bill numbers.
+  const bill = await getEwayBill(decodedInvoiceNo, 'production');
+  invoice.header.EwayBillNo = bill?.state === 'succeeded' ? bill.result?.EwbNo : '';
   const workbook = await buildInvoiceWorkbook(invoice);
   const buffer = await workbook.xlsx.writeBuffer();
   const safeName = decodedInvoiceNo.replace(/[^a-z0-9_-]+/gi, '_');
