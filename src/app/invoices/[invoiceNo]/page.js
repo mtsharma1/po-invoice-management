@@ -5,6 +5,7 @@ import InvoiceView from '@/components/InvoiceView';
 import PageHeader from '@/components/PageHeader';
 import PrintButton from '@/components/PrintButton';
 import { getInvoice } from '@/lib/invoices';
+import { getEwayBill } from '@/lib/whitebooksEwayBill';
 import { safeData } from '@/lib/safeData';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,14 @@ export const dynamic = 'force-dynamic';
 export default async function InvoiceDetailPage({ params }) {
   const { invoiceNo } = await params;
   const decodedInvoiceNo = decodeURIComponent(invoiceNo);
-  const { data, error } = await safeData(() => getInvoice(decodedInvoiceNo), { header: null, lines: [], totals: {} });
+  const { data, error } = await safeData(async () => {
+    const invoice = await getInvoice(decodedInvoiceNo);
+    if (invoice.header) {
+      const bill = await getEwayBill(decodedInvoiceNo, 'production');
+      invoice.header.EwayBillNo = bill?.state === 'succeeded' ? bill.result?.EwbNo : '';
+    }
+    return invoice;
+  }, { header: null, lines: [], totals: {} });
 
   return (
     <AppShell>

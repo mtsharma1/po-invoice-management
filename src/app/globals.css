@@ -7020,3 +7020,6 @@ table thead th,
 .ewaybill-actions .ewaybill-button:disabled { background: #e8ecf2; border-color: #d5dce6; color: #64748b; cursor: not-allowed; opacity: 1; }
 .ewaybill-actions .ewaybill-button:focus-visible { outline: 3px solid #93b4f8; outline-offset: 3px; }
 @media (max-width: 640px) { .ewaybill-actions .ewaybill-button { width: 100%; } }
+
+/* The fourth IRN row shares its lower edge with the invoice header frame. */
+.invoice-item-tax .irn-block .invoice-eway-number { border-bottom: 0; }
