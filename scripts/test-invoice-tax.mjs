@@ -23,6 +23,7 @@ for (const selected of [0, 1]) for (const version of [undefined, 0, 1]) {
   const header = { TaxDetailsVersion: version, InvoiceDate: '2026-09-01', InterStateTax: selected, CGST: selected ? 9 : 0, SGST: selected ? 9 : 0, IGSTRate: selected ? 0 : 18 };
   header.InvoiceNote = 'Deliver before Friday.\nContact receiving desk.';
   header.BeneficiaryName = 'TEAKWOOD';
+  header.EwayBillNo = selected ? '322357718459' : '';
   assert.equal(tax.lineTaxRates(header, { VendorArticleName: 'T_SH_TEST', Amount: 2499.99 }).taxRate, 5);
   assert.equal(tax.lineTaxRates(header, { VendorArticleName: ' t_sh_test ', Amount: 2500 }).taxRate, 5);
   assert.equal(tax.lineTaxRates(header, { VendorArticleName: 'T_SH_TEST', Amount: 2500.01 }).taxRate, 18);
@@ -66,6 +67,8 @@ for (const selected of [0, 1]) for (const version of [undefined, 0, 1]) {
   const reloaded = new ExcelJS.Workbook();
   await reloaded.xlsx.load(await workbook.xlsx.writeBuffer());
   const sheet = reloaded.getWorksheet('Invoice');
+  assert.equal(sheet.getCell('A4').text, selected ? 'E-way bill: 322357718459' : '');
+  assert.equal(sheet.getCell('I4').master.address, 'A4');
   assert.equal(sheet.getCell('K18').value, 'Tax %');
   assert.equal(sheet.getCell('L18').value, 'AMOUNT');
   assert.equal(sheet.getCell('K19').value, 5);

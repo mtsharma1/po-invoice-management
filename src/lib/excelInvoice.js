@@ -100,7 +100,8 @@ async function writeTopBlock(ws, header) {
   mergeValue(ws, 'A1:I1', `IRN : ${text(header.IRN)}`, 'left', true);
   mergeValue(ws, 'A2:I2', `Ack No. : ${text(header.AckNo)}`, 'left', true);
   mergeValue(ws, 'A3:I3', `Ack Date : ${dateTimeText(header.AckDate)}`, 'left', true);
-  mergeValue(ws, 'A4:I4', '', 'left', false);
+  const ewayBillNo = String(header.EwayBillNo || '').trim();
+  mergeValue(ws, 'A4:I4', /^\d{12}$/.test(ewayBillNo) ? `E-way bill: ${ewayBillNo}` : '', 'left', true);
   ws.mergeCells('J1:L4');
   ws.getCell('J1').alignment = { horizontal: 'center', vertical: 'middle' };
   ws.getCell('J1').value = 'QR';
