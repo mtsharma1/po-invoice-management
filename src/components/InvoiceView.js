@@ -17,6 +17,7 @@ export default function InvoiceView({ invoice }) {
           <strong>IRN : {text(header.IRN)}</strong>
           <strong>Ack No. : {text(header.AckNo)}</strong>
           <strong>Ack Date : {dateTimeText(header.AckDate)}</strong>
+          <strong className="invoice-eway-number">{/^\d{12}$/.test(String(header.EwayBillNo || '').trim()) ? `E-way bill: ${String(header.EwayBillNo).trim()}` : ''}</strong>
         </div>
         <div className="qr-box">
           <img src={invoiceQrUrl(header)} alt={`QR code for invoice ${text(header.InvoiceNo)}`} />

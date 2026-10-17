@@ -14,8 +14,11 @@ const lineTaxRates = (h,l) => ({taxRate: l.taxRate});\n` + source;
   await require('next/dist/build/swc').loadBindings();
   const { code } = await require('next/dist/build/swc').transform(source, { filename: 'InvoiceView.jsx', jsc: { parser: { syntax: 'ecmascript', jsx: true }, transform: { react: { runtime: 'classic' } } }, module: { type: 'commonjs' } });
   const mod = new Module(path.resolve('tmp/fixture.cjs'), module); mod.paths = module.paths; mod._compile(code, path.resolve('tmp/fixture.cjs'));
-  const invoice = { header: { TaxDetailsVersion: 1, InvoiceNo: 'PREVIEW', BillFromName: 'TEAKWOOD', BillFromAddress: 'Gurgaon, Haryana', DispatchFromName: 'TEAKWOOD', DispatchFromAddress: 'Jhajjar, Haryana', ConsigneeName: 'Example Buyer', DeliveredToName: 'Example Buyer', InvoiceNote: 'Trolly Bag, Shoes, Suitcase', BeneficiaryName: 'TEAKWOOD', AccountNo: '123456789', IFSCCode: 'TEST0000123', BankName: 'EXAMPLE BANK', BranchName: 'GURGAON', TotalInWords: 'RUPEES SEVEN THOUSAND NINE HUNDRED TWENTY SIX ONLY' }, lines: [{POID:1,SKUCode:'T_TR_INDIA_B1_G7616_01',VendorArticleName:'T_TR_INDIA_B1_G7616_01', HSNCode:'42021250', Qty:5,Rate:1102,Amount:5510,taxRate:18},{POID:2,SKUCode:'T_SH_INDIA_B1_BL_02',VendorArticleName:'T_SH_INDIA_B1_BL_02',HSNCode:'42021250',Qty:1,Rate:1356,Amount:1356,taxRate:5}], totals: { totalQty:6,taxableAmount:6866,isInterState:true,cgstRate:null,sgstRate:null,cgstAmount:529.8,sgstAmount:529.8,roundOff:0.4,grandTotal:7926,taxSummary:[{taxRate:5,taxableAmount:1356,cgstAmount:33.9,sgstAmount:33.9,igstAmount:0,totalTax:67.8,totalAmount:1423.8},{taxRate:18,taxableAmount:5510,cgstAmount:495.9,sgstAmount:495.9,igstAmount:0,totalTax:991.8,totalAmount:6501.8}] } };
+  const invoice = { header: { TaxDetailsVersion: 1, EwayBillNo: '322357718459', InvoiceNo: 'PREVIEW', BillFromName: 'TEAKWOOD', BillFromAddress: 'Gurgaon, Haryana', DispatchFromName: 'TEAKWOOD', DispatchFromAddress: 'Jhajjar, Haryana', ConsigneeName: 'Example Buyer', DeliveredToName: 'Example Buyer', InvoiceNote: 'Trolly Bag, Shoes, Suitcase', BeneficiaryName: 'TEAKWOOD', AccountNo: '123456789', IFSCCode: 'TEST0000123', BankName: 'EXAMPLE BANK', BranchName: 'GURGAON', TotalInWords: 'RUPEES SEVEN THOUSAND NINE HUNDRED TWENTY SIX ONLY' }, lines: [{POID:1,SKUCode:'T_TR_INDIA_B1_G7616_01',VendorArticleName:'T_TR_INDIA_B1_G7616_01', HSNCode:'42021250', Qty:5,Rate:1102,Amount:5510,taxRate:18},{POID:2,SKUCode:'T_SH_INDIA_B1_BL_02',VendorArticleName:'T_SH_INDIA_B1_BL_02',HSNCode:'42021250',Qty:1,Rate:1356,Amount:1356,taxRate:5}], totals: { totalQty:6,taxableAmount:6866,isInterState:true,cgstRate:null,sgstRate:null,cgstAmount:529.8,sgstAmount:529.8,roundOff:0.4,grandTotal:7926,taxSummary:[{taxRate:5,taxableAmount:1356,cgstAmount:33.9,sgstAmount:33.9,igstAmount:0,totalTax:67.8,totalAmount:1423.8},{taxRate:18,taxableAmount:5510,cgstAmount:495.9,sgstAmount:495.9,igstAmount:0,totalTax:991.8,totalAmount:6501.8}] } };
   const html = renderToStaticMarkup(React.createElement(mod.exports.default,{invoice}));
+  if (!html.includes('E-way bill: 322357718459')) throw new Error('E-way bill number missing');
+  const blankHtml = renderToStaticMarkup(React.createElement(mod.exports.default,{invoice:{...invoice,header:{...invoice.header,EwayBillNo:''}}}));
+  if (blankHtml.includes('E-way bill:')) throw new Error('Ungenerated bill must remain blank');
   const { chromium } = require('C:/Users/Mithlesh/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
   const browser = await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
   const page = await browser.newPage({viewport:{width:1450,height:1100}});
@@ -31,8 +34,8 @@ const lineTaxRates = (h,l) => ({taxRate: l.taxRate});\n` + source;
     frame: getComputedStyle(document.querySelector('.invoice-main-block')).borderRightWidth,
   }));
   if (borders.top !== '0px' || borders.right.some(width => width !== '0px') || borders.frame !== '1px') throw new Error(JSON.stringify(borders));
-  await page.pdf({path:'tmp/pdfs/invoice-border-check.pdf',preferCSSPageSize:true,printBackground:true});
   await page.screenshot({path:'tmp/invoice-layout-print.png',fullPage:true});
   await browser.close(); console.log('Screen alignment and print previews verified.');
 })().catch(error => { console.error(error); process.exit(1); });
+
 
