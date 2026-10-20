@@ -31,10 +31,11 @@ globalThis.fetch = async () => Response.json({ status_cd: '0', status_desc: 'sec
 await assert.rejects(api.generateWhitebooksEwayBill({}, auth, 'production'), /did not confirm/);
 globalThis.fetch = async () => { throw new Error('Unexpected network call'); };
 
-let record, source, header, counts, failSave, failGenerate, missingIrp, wrongGstin, providerResult, lookupFailure;
+let record, source, header, counts, failSave, failGenerate, missingIrp, wrongGstin, providerResult, lookupFailure, recentRequest, reservationLost;
 const result = { EwbNo: 123456789012, EwbDt: 'test', EwbValidTill: 'test' };
 function reset() {
   providerResult = null; lookupFailure = false;
+  recentRequest = reservationLost = false;
   record = null; source = { state: 'succeeded', result: { Irn: 'a'.repeat(64), Status: 'ACT' } };
   header = { InvoiceNo: 'SYNTHETIC/1', IRN: 'a'.repeat(64), GSTN: 'TESTGSTIN' };
   counts = { auth: 0, generate: 0 }; failSave = failGenerate = missingIrp = wrongGstin = false;
@@ -53,6 +54,17 @@ globalThis.__irnEwb = {
       record = { State: args[2], ResultJson: args[4] || null }; return { affectedRows: 1 };
     }
     if (sql.startsWith('UPDATE')) {
+      if (args[0] === 'retryable') {
+        assert.match(sql, /INTERVAL 5 MINUTE/);
+        assert.match(sql, /ResultJson IS NULL/);
+        assert.equal(args[2], header.IRN);
+        if (recentRequest || record.ResultJson || !['pending', 'uncertain'].includes(record.State)) return { affectedRows: 0 };
+      }
+      if (args[0] === 'pending') {
+        assert.match(sql, /State = 'retryable'/);
+        assert.match(sql, /DocumentKey = \?/);
+        if (reservationLost || record.State !== 'retryable') return { affectedRows: 0 };
+      }
       if (args[0] === 'succeeded' && failSave) return { affectedRows: 0 };
       record.State = args[0]; if (args[0] === 'succeeded') record.ResultJson = args[1];
       return { affectedRows: 1 };
@@ -115,6 +127,29 @@ assert.equal((await service.reconcileEwayBill('SYNTHETIC/1', 'production', Strin
 assert.equal(JSON.parse(record.ResultJson).EwbNo, result.EwbNo); assert.equal(counts.generate, 0);
 reset(); lookupFailure = true; await assert.rejects(generate, /Lookup unavailable/); assert.equal(record, null); assert.equal(counts.generate, 0);
 reset(); assert.equal((await service.reconcileEwayBill('SYNTHETIC/1')).state, 'not_found'); assert.equal(record, null);
+for (const state of ['pending', 'uncertain']) {
+  reset(); record = { State: state, ResultJson: null };
+  assert.equal((await service.reconcileEwayBill('SYNTHETIC/1')).state, 'not_found');
+  assert.equal(record.State, 'retryable');
+  assert.equal(counts.generate, 0, 'Status lookup must not generate');
+  assert.equal((await service.getEwayBill('SYNTHETIC/1')).state, 'retryable', 'Unlocked state survives reload');
+  assert.equal((await generate()).state, 'succeeded');
+  assert.equal(counts.generate, 1);
+}
+reset(); record = { State: 'pending', ResultJson: null }; recentRequest = true;
+await assert.rejects(service.reconcileEwayBill('SYNTHETIC/1'), /Wait five minutes/);
+assert.equal(record.State, 'pending');
+reset(); record = { State: 'uncertain', ResultJson: null }; lookupFailure = true;
+await assert.rejects(service.reconcileEwayBill('SYNTHETIC/1'), /Lookup unavailable/);
+assert.equal(record.State, 'uncertain');
+reset(); record = { State: 'uncertain', ResultJson: JSON.stringify(result) };
+await assert.rejects(service.reconcileEwayBill('SYNTHETIC/1'), /status changed/);
+assert.equal(record.State, 'uncertain', 'Never discard a saved result');
+reset(); record = { State: 'retryable', ResultJson: null }; reservationLost = true;
+await assert.rejects(generate, /status changed/); assert.equal(counts.generate, 0);
+reset(); record = { State: 'retryable', ResultJson: null }; providerResult = result;
+assert.equal((await generate()).requiresConfirmation, true);
+assert.equal(counts.generate, 0, 'Recheck provider before every retry');
 globalThis.fetch = async (url, options) => {
   assert.equal(options.method, 'GET');
   assert.equal(url.pathname, '/einvoice/type/GETIRN/version/V1_03');

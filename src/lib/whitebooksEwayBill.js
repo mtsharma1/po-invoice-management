@@ -114,7 +114,7 @@ export async function generateEwayBill(invoiceNo, transport, draft, environment 
   const table = resultTable(environment);
   const existing = await getEwayBill(invoiceNo, environment);
   if (existing?.state === 'succeeded') return { ok: true, ...existing };
-  if (existing) throw new WhitebooksError('A previous e-way bill request is pending or uncertain. Reconcile it in WhiteBooks before resubmitting.');
+  if (existing && existing.state !== 'retryable') throw new WhitebooksError('A previous e-way bill request is pending or uncertain. Reconcile it in WhiteBooks before resubmitting.');
   // Production B2B invoices use their registered IRN, never editable browser invoice data.
   const source = environment === 'production' ? await getProductionIrn(invoiceNo) : await getSandboxIrn(invoiceNo);
   const invoice = environment === 'production' ? await getInvoice(invoiceNo) : null;
@@ -156,7 +156,14 @@ export async function generateEwayBill(invoiceNo, transport, draft, environment 
     generate = generateStandaloneWhitebooksEwayBill;
   }
   try {
-    await query(`INSERT INTO ${table} (InvoiceNo, DocumentKey, State, RequestJson) VALUES (?, ?, ?, ?)`, [invoiceNo, key, 'pending', JSON.stringify(document)]);
+    if (existing?.state === 'retryable') {
+      const reserved = await query(`UPDATE ${table} SET State = ?, RequestJson = ?, UpdatedAt = CURRENT_TIMESTAMP
+        WHERE InvoiceNo = ? AND DocumentKey = ? AND State = 'retryable' AND ResultJson IS NULL`,
+      ['pending', JSON.stringify(document), invoiceNo, key]);
+      if (reserved.affectedRows !== 1) throw new WhitebooksError('Submission status changed. Check status before generating again.');
+    } else {
+      await query(`INSERT INTO ${table} (InvoiceNo, DocumentKey, State, RequestJson) VALUES (?, ?, ?, ?)`, [invoiceNo, key, 'pending', JSON.stringify(document)]);
+    }
   } catch (error) {
     if (error.code === 'ER_DUP_ENTRY') throw new WhitebooksError('An e-way bill submission already exists. Refresh its status.');
     throw error;
@@ -187,10 +194,22 @@ export async function reconcileEwayBill(invoiceNo, environment = getEwayBillEnvi
   const auth = await authenticateWhitebooks(environment);
   auth.irp ||= process.env.WHITEBOOKS_PRODUCTION_IRP?.trim();
   const result = await getWhitebooksEwayBillByIrn(irn, auth, environment, { allowMissing: true });
-  if (!result) return { ok: true, state: 'not_found', result: null };
+  if (!result) {
+    // Only an explicit no-bill response for this active IRN reaches this branch.
+    // Leave recent requests locked while a submission may still be completing.
+    if (existing && existing.state !== 'retryable') {
+      const cleared = await query(`UPDATE ${resultTable(environment)} SET State = ?, UpdatedAt = CURRENT_TIMESTAMP
+        WHERE InvoiceNo = ? AND State IN ('pending', 'uncertain') AND ResultJson IS NULL
+        AND UpdatedAt < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 5 MINUTE)
+        AND JSON_UNQUOTE(JSON_EXTRACT(RequestJson, '$.Irn')) = ?`,
+      ['retryable', invoiceNo, irn]);
+      if (cleared.affectedRows !== 1) throw new WhitebooksError('The submission is recent or its status changed. Wait five minutes, then check e-way bill status again.');
+    }
+    return { ok: true, state: 'not_found', result: null };
+  }
   if (confirmedEwbNo === null) return { ok: true, state: 'found', requiresConfirmation: true, result };
   if (String(result.EwbNo) !== confirmedEwbNo) throw new WhitebooksError('WhiteBooks details changed. Check status and confirm the displayed bill again.');
-  // Never clear an uncertain submission or call a generation API during recovery.
+  // Save an existing bill only after confirmation; recovery never generates.
   if (existing) {
     const saved = await query(`UPDATE ${resultTable(environment)} SET State = ?, ResultJson = ? WHERE InvoiceNo = ?`, ['succeeded', JSON.stringify(result), invoiceNo]);
     if (saved.affectedRows !== 1) throw new WhitebooksError('Existing e-way bill found, but saving failed. Check status again; do not regenerate.');
