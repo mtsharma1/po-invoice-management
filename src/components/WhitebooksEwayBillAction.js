@@ -58,7 +58,7 @@ export default function WhitebooksEwayBillAction({ invoiceNo, transport, draft, 
       const body = await response.json();
       if (!response.ok || !body.ok) throw new Error(body.error || 'Status lookup failed.');
       if (body.requiresConfirmation) { setFoundBill(body.result); setMessage('An e-way bill already exists. Review it below before saving.'); return; }
-      if (body.state === 'not_found') { setFoundBill(null); setMessage('WhiteBooks reports no e-way bill linked to this IRN. No changes were saved.'); return; }
+      if (body.state === 'not_found') { setFoundBill(null); setSubmission(null); setMessage('No e-way bill exists for this IRN. You can now generate it.'); return; }
       setFoundBill(null);
       setSubmission({ state: body.state, result: body.result });
       setMessage(saveExisting ? 'Existing e-way bill saved for this invoice. No new bill was generated.' : 'E-way bill details are already saved for this invoice.');
@@ -93,7 +93,7 @@ export default function WhitebooksEwayBillAction({ invoiceNo, transport, draft, 
     <div className="einvoice-section-body">
       <div className="einvoice-actionbar">
         <button type="button" className="ewaybill-button ewaybill-button-save" disabled={pending} onClick={saveTransport}>Save transport details</button>
-        <button type="button" className="ewaybill-button ewaybill-button-primary" disabled={!loaded || pending || Boolean(submission) || Boolean(foundBill)} onClick={generate}>{pending ? 'Please wait…' : `Generate ${environment} e-way bill`}</button>
+        <button type="button" className="ewaybill-button ewaybill-button-primary" disabled={!loaded || pending || Boolean(submission && submission.state !== 'retryable') || Boolean(foundBill)} onClick={generate}>{pending ? 'Please wait…' : `Generate ${environment} e-way bill`}</button>
         {environment === 'production' ? <button type="button" className="ewaybill-button ewaybill-button-secondary" disabled={!loaded || pending} onClick={() => checkStatus(false)}>Check E-Way Bill Status</button> : null}
       </div>
       {foundBill ? <div role="region" aria-label="Existing e-way bill confirmation">
@@ -111,7 +111,7 @@ export default function WhitebooksEwayBillAction({ invoiceNo, transport, draft, 
       {submission?.result ? <button type="button" className="ewaybill-button ewaybill-button-secondary" onClick={download}>Download e-way bill result</button> : null}
       {loaded && submission?.state === 'succeeded' && /^\d{12}$/.test(String(submission?.result?.EwbNo)) ? <button type="button" className="ewaybill-button ewaybill-button-pdf" disabled={pending} onClick={downloadPdf}>Download e-way bill PDF</button> : null}
       </div>
-      {submission && submission.state !== 'succeeded' ? <p>Previous submission pending or uncertain. Check WhiteBooks before resubmitting.</p> : null}
+      {submission && !['succeeded', 'retryable'].includes(submission.state) ? <p>Previous submission pending or uncertain. Check WhiteBooks before resubmitting.</p> : null}
       <p role="status" aria-live="polite">{message}</p>
     </div>
   </section>;
