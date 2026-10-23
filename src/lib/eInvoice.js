@@ -1,6 +1,6 @@
 import { getInvoice, listInvoices } from './invoices';
 import { getEwayBillTransport } from './ewayBillTransport';
-import { lineTaxRates, usesItemTaxDetails } from './invoiceTax';
+import { lineTaxRates, usesItemTaxDetails, transportationChargeLine } from './invoiceTax';
 
 export const SUPPLY_TYPES = Object.freeze([
   { value: 'B2B', label: 'B2B — Business to business' },
@@ -141,7 +141,7 @@ export function createEInvoiceDraft(invoice) {
     sourceSummary: {
       lineCount: lines.length,
       totalQty: roundQuantity(lines.reduce((sum, line) => sum + number(line.Qty), 0)),
-      taxableAmount: roundMoney(lines.reduce((sum, line) => sum + number(line.Amount), 0)),
+      taxableAmount: roundMoney(lines.reduce((sum, line) => sum + number(line.Amount), 0) + number(header.TransportationCharges)),
       buyerSource: 'Consignee Address',
     },
   };
@@ -201,6 +201,11 @@ function buildDocument(invoice, draft) {
   const itemList = invoice.lines.map((line, index) => buildItem(line, index,
     usesItemTaxDetails(invoice.header) ? lineTaxRates(invoice.header, line).taxRate : invoiceGstRate(invoice.header),
     useIgst, withoutPayment, includeFreeQuantity));
+  const transportation = transportationChargeLine(invoice.header);
+  if (transportation) {
+    itemList.push({ ...buildItem(transportation, itemList.length, lineTaxRates(invoice.header, transportation).taxRate,
+      useIgst, withoutPayment, includeFreeQuantity), IsServc: 'Y' });
+  }
   const assVal = sumMoney(itemList, 'AssAmt');
   const igstVal = sumMoney(itemList, 'IgstAmt');
   const cgstVal = sumMoney(itemList, 'CgstAmt');
@@ -209,7 +214,7 @@ function buildDocument(invoice, draft) {
   const stCesVal = sumMoney(itemList, 'StateCesAmt');
   const itemTotal = roundMoney(itemList.reduce((sum, item) => sum + number(item.TotItemVal), 0));
   const storedGrandTotal = number(invoice.header.GrandTotal);
-  const totalInvVal = storedGrandTotal > 0 && Math.abs(storedGrandTotal - itemTotal) <= 1
+  const totalInvVal = !transportation && storedGrandTotal > 0 && Math.abs(storedGrandTotal - itemTotal) <= 1
     ? roundMoney(storedGrandTotal)
     : Math.round(itemTotal);
   const roundOff = roundMoney(totalInvVal - itemTotal);

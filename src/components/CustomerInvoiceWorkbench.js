@@ -228,6 +228,18 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
             />
           </div>
 
+          <div className="bank-panel transportation-panel">
+            <div className="bank-title">TRANSPORTATION CHARGES</div>
+            <div className="bank-grid">
+              <FormInput label="Transportation Charges (₹)" type="number" min="0" step="0.01"
+                value={form.TransportationCharges ?? 0}
+                onChange={(value) => updateField('TransportationCharges', value)} />
+            </div>
+            {!['', 'null', 'undefined'].includes(String(form.IRN ?? '').trim().toLowerCase()) ? (
+              <p className="transportation-notice">Changing this charge updates the local invoice and its totals. The registered IRN and e-way bill are not amended.</p>
+            ) : null}
+          </div>
+
           <div className="bank-panel">
             <div className="bank-title">BANK DETAILS</div>
             <div className="bank-grid">
@@ -309,11 +321,11 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
   );
 }
 
-function FormInput({ label, value, onChange, type = 'text' }) {
+function FormInput({ label, value, onChange, type = 'text', min, step }) {
   return (
     <label className="access-field">
       <span>{label}</span>
-      <input type={type} value={value || ''} onChange={(event) => onChange(event.target.value)} />
+      <input type={type} min={min} step={step} value={value ?? ''} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
@@ -360,6 +372,7 @@ function normaliseInvoice(invoice) {
   const useCgstSgst = Number(source.InterStateTax || 0) !== 0;
   return {
     ...source,
+    TransportationCharges: source.TransportationCharges ?? 0,
     InterStateTax: useCgstSgst ? 1 : 0,
     SGST: useCgstSgst ? positiveRate(source.SGST, 9) : 0,
     CGST: useCgstSgst ? positiveRate(source.CGST, 9) : 0,

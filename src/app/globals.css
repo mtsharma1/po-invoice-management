@@ -5496,6 +5496,22 @@ table thead th,
   grid-template-columns: 100px minmax(0, 1fr);
 }
 
+.transportation-panel .bank-grid {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 520px;
+}
+
+.transportation-panel .access-field {
+  grid-template-columns: 210px minmax(0, 1fr);
+}
+
+.transportation-notice {
+  margin: 0 13px 10px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .invoice-action-bar {
   gap: 8px;
   margin-top: 8px;
@@ -5972,6 +5988,53 @@ table thead th,
   font-weight: 650 !important;
 }
 /* END CUSTOMER INVOICE REDESIGN EXPERIMENT */
+
+/* Keep invoice fields and QR inside the editor, independent of list width. */
+.customer-invoice-access .customer-invoice-left {
+  container-type: inline-size;
+}
+
+.customer-invoice-access .invoice-top-panel {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 144px;
+}
+
+.customer-invoice-access .invoice-basic-fields,
+.customer-invoice-access .invoice-tax-fields {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.customer-invoice-access .invoice-top-panel .access-field,
+.customer-invoice-access .invoice-top-panel input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.customer-invoice-access .invoice-qr-box {
+  min-width: 0;
+  width: 144px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@container (max-width: 850px) {
+  .customer-invoice-access .invoice-top-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .customer-invoice-access .invoice-qr-box {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+@container (max-width: 560px) {
+  .customer-invoice-access .invoice-top-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .customer-invoice-access .invoice-qr-box {
+    justify-self: center;
+  }
+}
 
 /* Simple login page. The previous two-panel page remains available in page.backup.js. */
 .simple-login-page {

@@ -115,7 +115,7 @@ export async function getInvoice(invoiceNo) {
   return {
     header: {
       ...header,
-      TotalInWords: storedTotalInWords && storedTotalInWords.toUpperCase() !== 'NULL'
+      TotalInWords: !totals.transportationCharges && storedTotalInWords && storedTotalInWords.toUpperCase() !== 'NULL'
         ? storedTotalInWords
         : amountInWords(totals.grandTotal),
     },
@@ -144,6 +144,7 @@ export function calculateInvoiceTotals(header, lines) {
 
   return {
     taxSummary,
+    transportationCharges: roundMoney(header?.TransportationCharges),
     totalQty,
     taxableAmount,
     isInterState,
