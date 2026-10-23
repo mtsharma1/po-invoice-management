@@ -3,6 +3,7 @@ import { getShellOrderContext, listPOBarcodes } from './shellOrders';
 import { getWebSettings } from './settings';
 import { ensurePOConsigneeNameColumn } from './poSchema';
 import { ensureInvoiceTaxVersionColumn } from './invoiceTaxSchema';
+import { validateDispatchQuantity } from './dispatchQuantity';
 
 const defaultInvoiceBankDetails = {
   accountNo: '6811361613',
@@ -290,8 +291,14 @@ export async function listDispatchViewRows(poBarcode) {
 }
 
 export async function updateDispatchDraftQty({ sessionId, poBarcode, draftId, dispatchQty }) {
-  const qty = Math.max(0, Number(dispatchQty || 0));
-  const result = await query(
+  return withTransaction(async (run) => {
+  const rows = await run(
+    `SELECT Quantity FROM webTmpDispatch WHERE SessionId = ? AND POBarcode = ? AND WTDID = ?
+     AND COALESCE(DispatchNo, '') = '' FOR UPDATE`, [sessionId, poBarcode, draftId]
+  );
+  if (!rows.length) throw new Error('Dispatch row is no longer available for editing. Please refresh.');
+  const qty = validateDispatchQuantity(dispatchQty, rows[0].Quantity);
+  const result = await run(
     `UPDATE webTmpDispatch
      SET DispatchQty = ?
      WHERE SessionId = ?
@@ -305,6 +312,7 @@ export async function updateDispatchDraftQty({ sessionId, poBarcode, draftId, di
     updatedRows: result.affectedRows || 0,
     message: 'Dispatch quantity updated.',
   };
+  });
 }
 
 export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
@@ -334,10 +342,25 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
     }
 
     const poHeaderRows = await run(
-      'SELECT BillTo, ShipTo, ConsigneeName FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1',
+      'SELECT BillTo, ShipTo, ConsigneeName FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1 FOR UPDATE',
       [poBarcode]
     );
     const poHeader = poHeaderRows[0] || {};
+
+    const quantities = await run(
+      `SELECT tmp.POID, SUM(COALESCE(tmp.DispatchQty, 0)) AS Requested,
+              MAX(COALESCE(pod.Quantity, 0)) - COALESCE((SELECT SUM(d.DispatchQty)
+                FROM tblDispatch d WHERE d.POID = tmp.POID), 0) AS Available,
+              MIN(COALESCE(tmp.DispatchQty, 0)) AS MinimumQty
+       FROM webTmpDispatch tmp LEFT JOIN tblPODetails pod ON pod.POID = tmp.POID
+       WHERE tmp.SessionId = ? AND tmp.POBarcode = ? AND COALESCE(tmp.DispatchNo, '') = ''
+       GROUP BY tmp.POID`, [sessionId, poBarcode]
+    );
+    for (const row of quantities) {
+      validateDispatchQuantity(row.MinimumQty, Number.MAX_SAFE_INTEGER);
+      try { validateDispatchQuantity(row.Requested, row.Available); }
+      catch (error) { throw new Error(`PO item ${row.POID}: ${error.message}`); }
+    }
 
     const pendingRows = await run(
       `SELECT WTDID
@@ -458,6 +481,7 @@ export async function uploadDispatchFile({ sessionId, selectedPO = '', fileBuffe
 
     let insertedRows = 0;
     let skippedRows = 0;
+    const importedQuantities = new Map();
     for (const item of items) {
       const poRows = await run(
         `SELECT POID, Quantity
@@ -483,6 +507,11 @@ export async function uploadDispatchFile({ sessionId, selectedPO = '', fileBuffe
       );
       const partialDispatchQty = Number(dispatchRows[0]?.PartialDispatchQty || 0);
       const quantity = Math.max(0, Number(poRow.Quantity || 0) - partialDispatchQty);
+      validateDispatchQuantity(item.dispatchQty, quantity);
+      const itemKey = `${item.poBarcode}:${poRow.POID}`;
+      const totalImported = (importedQuantities.get(itemKey) || 0) + item.dispatchQty;
+      validateDispatchQuantity(totalImported, quantity);
+      importedQuantities.set(itemKey, totalImported);
 
       await run(
         `INSERT INTO webTmpDispatch
