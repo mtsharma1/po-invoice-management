@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import ActionIcon from './ActionIcon';
+import PurchaseOrderCombobox from './PurchaseOrderCombobox';
 
 const columns = [
   ['POID', 'POID'],
@@ -203,18 +204,11 @@ export default function MasterWorkbench({ data, selectedPO }) {
       </header>
 
       <div className="master-toolbar">
-        <label>
-          <span>PO BARCODE</span>
-          <select value={selectedPO} onChange={(event) => selectPO(event.target.value)} disabled={isPending}>
-            <option value="">All purchase orders</option>
-            {data.purchaseOrders.map((po) => (
-              <option key={po.POBarcode} value={po.POBarcode}>
-                {po.POBarcode}
-                {/* {po.POBarcode} · {Number(po.lineCount).toLocaleString('en-IN')} lines */}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="master-po-filter">
+          <label htmlFor="master-po-search">PO BARCODE</label>
+          <PurchaseOrderCombobox id="master-po-search" value={selectedPO} purchaseOrders={data.purchaseOrders}
+            onChange={selectPO} disabled={isPending} />
+        </div>
         <button className="master-clear" type="button" onClick={() => selectPO('')} disabled={!selectedPO || isPending}>
           <ActionIcon name="reset" /> Clear
         </button>

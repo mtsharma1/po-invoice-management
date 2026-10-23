@@ -4,10 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { dateText, money, qty, text } from '@/lib/format';
 import ActionIcon from './ActionIcon';
+import { validateDispatchQuantity } from '@/lib/dispatchQuantity';
 
 export default function DispatchWorkbench({ poOptions, selectedPO, poContext, rows, mode }) {
   const router = useRouter();
   const uploadInputRef = useRef(null);
+  const invalidQuantityRows = useRef(new Set());
   const [message, setMessage] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
@@ -71,6 +73,9 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
 
   function saveDispatchQty(row, value) {
     if (!isEditMode) return;
+    if (invalidQuantityRows.current.delete(row.WTDID)) return;
+    try { validateDispatchQuantity(value, row.Quantity); }
+    catch (error) { setMessage(error.message); return; }
     startTransition(async () => {
       try {
         const result = await postAction('/api/dispatch/update-row', {
@@ -87,7 +92,11 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
   }
 
   function changeDispatchQty(row, value) {
-    const nextQty = Math.max(0, Number(value || 0));
+    let nextQty;
+    try { nextQty = validateDispatchQuantity(value, row.Quantity); }
+    catch (error) { invalidQuantityRows.current.add(row.WTDID); setMessage(error.message); return; }
+    invalidQuantityRows.current.delete(row.WTDID);
+    setMessage('');
     setDraftRows((currentRows) =>
       currentRows.map((currentRow) =>
         currentRow.WTDID === row.WTDID
@@ -329,6 +338,8 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
                     <input
                       type="number"
                       min="0"
+                      max={Math.max(0, Number(row.Quantity || 0))}
+                      step="1"
                       value={row.DispatchQty ?? 0}
                       onChange={(event) => changeDispatchQty(row, event.target.value)}
                       onBlur={(event) => saveDispatchQty(row, event.target.value)}
