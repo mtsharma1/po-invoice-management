@@ -1538,6 +1538,10 @@ table.data-table {
 }
 
 .editable-dispatch-cell input:focus { border-color: #34715a; box-shadow: 0 0 0 3px rgba(52, 113, 90, .1); }
+.dispatch-quantity-editor { display: flex; align-items: center; gap: 8px; }
+.dispatch-quantity-editor input { flex-shrink: 0; }
+.dispatch-quantity-error { width: 210px; white-space: normal; text-align: left; color: #b42318; font-size: 12px; line-height: 1.4; }
+.dispatch-quantity-editor input[aria-invalid="true"] { border-color: #b42318; }
 
 .dispatch-grid .selected-row td {
   background: #f2f8f4;

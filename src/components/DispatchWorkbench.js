@@ -10,6 +10,7 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
   const router = useRouter();
   const uploadInputRef = useRef(null);
   const invalidQuantityRows = useRef(new Set());
+  const [quantityErrors, setQuantityErrors] = useState({});
   const [message, setMessage] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
@@ -75,7 +76,7 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
     if (!isEditMode) return;
     if (invalidQuantityRows.current.delete(row.WTDID)) return;
     try { validateDispatchQuantity(value, row.Quantity); }
-    catch (error) { setMessage(error.message); return; }
+    catch (error) { setQuantityErrors(current => ({ ...current, [row.WTDID]: error.message })); return; }
     startTransition(async () => {
       try {
         const result = await postAction('/api/dispatch/update-row', {
@@ -84,9 +85,10 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
           dispatchQty: value,
         });
         setMessage(result.message || 'Dispatch quantity updated.');
+        setQuantityErrors(current => ({ ...current, [row.WTDID]: '' }));
         router.refresh();
       } catch (error) {
-        setMessage(error.message);
+        setQuantityErrors(current => ({ ...current, [row.WTDID]: error.message }));
       }
     });
   }
@@ -94,8 +96,14 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
   function changeDispatchQty(row, value) {
     let nextQty;
     try { nextQty = validateDispatchQuantity(value, row.Quantity); }
-    catch (error) { invalidQuantityRows.current.add(row.WTDID); setMessage(error.message); return; }
+    catch (error) {
+      invalidQuantityRows.current.add(row.WTDID);
+      setQuantityErrors(current => ({ ...current, [row.WTDID]: error.message }));
+      setMessage('');
+      return;
+    }
     invalidQuantityRows.current.delete(row.WTDID);
+    setQuantityErrors(current => ({ ...current, [row.WTDID]: '' }));
     setMessage('');
     setDraftRows((currentRows) =>
       currentRows.map((currentRow) =>
@@ -335,11 +343,15 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
                 <td className="num">{qty(row.Quantity)}</td>
                 <td className="num editable-dispatch-cell">
                   {isEditMode ? (
+                    <div className="dispatch-quantity-editor">
                     <input
                       type="number"
                       min="0"
                       max={Math.max(0, Number(row.Quantity || 0))}
                       step="1"
+                      aria-label={`Dispatch quantity for PO item ${row.POID}`}
+                      aria-invalid={Boolean(quantityErrors[row.WTDID])}
+                      aria-describedby={quantityErrors[row.WTDID] ? `dispatch-qty-error-${row.WTDID}` : undefined}
                       value={row.DispatchQty ?? 0}
                       onChange={(event) => changeDispatchQty(row, event.target.value)}
                       onBlur={(event) => saveDispatchQty(row, event.target.value)}
@@ -349,6 +361,10 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
                         }
                       }}
                     />
+                    {quantityErrors[row.WTDID] ? <span id={`dispatch-qty-error-${row.WTDID}`} className="dispatch-quantity-error" role="alert">
+                      {quantityErrors[row.WTDID]}
+                    </span> : null}
+                    </div>
                   ) : (
                     qty(row.DispatchQty)
                   )}
