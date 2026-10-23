@@ -8,6 +8,7 @@ import ActionIcon from './ActionIcon';
 const columns = [
   ['POBarcode', 'PO BARCODE', 150],
   ['StyleId', 'STYLE ID', 110],
+  ['SKUCode', 'SKU CODE', 170],
   ['HSNCode', 'HSN CODE', 110],
   ['Brand', 'BRAND', 120],
   ['GTIN', 'GTIN', 130],

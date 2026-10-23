@@ -56,9 +56,9 @@ const detailColumns = [
 // imports, but the current PO workbook marks them red and explicitly excludes
 // them from import. Saving null/default values also prevents stale spreadsheet
 // values from leaking into new purchase orders.
+// SKU Code is optional, but is imported whenever supplied in the workbook.
 const ignoredWorkbookColumns = new Set([
   'SKUId',
-  'SKUCode',
   'VendorArticleNumber',
   'CreditPeriod',
   'MarginType',
