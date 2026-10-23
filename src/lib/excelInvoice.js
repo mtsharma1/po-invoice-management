@@ -78,7 +78,7 @@ export async function buildInvoiceWorkbook({ header, lines, totals }) {
   if (summaryStart > totalsStart + 1) {
     mergeValue(ws, `A${totalsStart + 1}:G${summaryStart - 1}`, '', 'left');
   }
-  writeTaxSummary(ws, summaryStart, totals, firstLineRow, lastLineRow);
+  writeTaxSummary(ws, summaryStart, totals, firstLineRow, lastLineRow, totalsLayout.transportationRow);
 
   const printLastRow = signatureEnd + 1;
   outline(ws, 1, totalsLayout.wordsRow - 1);
@@ -213,8 +213,9 @@ function writeItemLine(ws, rowNumber, line, slNo, header) {
 }
 
 function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
-  const taxableRow = startRow + 1;
-  const firstTaxRow = startRow + 2;
+  const transportationRow = totals.transportationCharges > 0 ? startRow + 1 : null;
+  const taxableRow = startRow + (transportationRow ? 2 : 1);
+  const firstTaxRow = taxableRow + 1;
   const taxRowCount = totals.isInterState ? 2 : 1;
   const lastTaxRow = firstTaxRow + taxRowCount - 1;
   const roundRow = lastTaxRow + 1;
@@ -233,12 +234,13 @@ function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
     ws.getCell(`${column}${startRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   }
 
-  setFormulaTotalLine(ws, taxableRow, 'TAXABLE AMOUNT', `SUM(L${firstLineRow}:L${lastLineRow})`, totals.taxableAmount);
+  if (transportationRow) setFormulaTotalLine(ws, transportationRow, 'TRANSPORTATION CHARGES', String(totals.transportationCharges), totals.transportationCharges);
+  setFormulaTotalLine(ws, taxableRow, 'TAXABLE AMOUNT', `SUM(L${firstLineRow}:L${lastLineRow})${transportationRow ? `+L${transportationRow}` : ''}`, totals.taxableAmount);
   if (totals.isInterState) {
-    setTaxLine(ws, firstTaxRow, 'CGST', totals.cgstRate, taxableRow, totals.cgstAmount, taxFormula(totals.taxSummary, 'cgstRate', firstLineRow, lastLineRow));
-    setTaxLine(ws, firstTaxRow + 1, 'SGST', totals.sgstRate, taxableRow, totals.sgstAmount, taxFormula(totals.taxSummary, 'sgstRate', firstLineRow, lastLineRow));
+    setTaxLine(ws, firstTaxRow, 'CGST', totals.cgstRate, taxableRow, totals.cgstAmount, taxFormula(totals.taxSummary, 'cgstRate', firstLineRow, lastLineRow, transportationRow));
+    setTaxLine(ws, firstTaxRow + 1, 'SGST', totals.sgstRate, taxableRow, totals.sgstAmount, taxFormula(totals.taxSummary, 'sgstRate', firstLineRow, lastLineRow, transportationRow));
   } else {
-    setTaxLine(ws, firstTaxRow, 'IGST', totals.igstRate, taxableRow, totals.igstAmount, taxFormula(totals.taxSummary, 'igstRate', firstLineRow, lastLineRow));
+    setTaxLine(ws, firstTaxRow, 'IGST', totals.igstRate, taxableRow, totals.igstAmount, taxFormula(totals.taxSummary, 'igstRate', firstLineRow, lastLineRow, transportationRow));
   }
   setFormulaTotalLine(
     ws,
@@ -253,7 +255,7 @@ function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
   ws.getCell(`A${wordsRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F3F5' } };
   ws.getRow(wordsRow).height = 22;
 
-  return { footerStart: wordsRow + 1, wordsRow, grandRow };
+  return { footerStart: wordsRow + 1, wordsRow, grandRow, transportationRow };
 }
 
 function setFormulaTotalLine(ws, rowNumber, label, formula, result, emphasize = false) {
@@ -287,11 +289,12 @@ function setTaxLine(ws, rowNumber, label, rate, taxableRow, amount, formula) {
   valueCell.border = allBorders(borderThin);
 }
 
-function taxFormula(groups, field, first, last) {
-  return groups.map((group) => `SUMPRODUCT(--(K${first}:K${last}=${group.taxRate}),ROUND(L${first}:L${last}*${group[field]}/100,2))`).join('+') || '0';
+function taxFormula(groups, field, first, last, transportationRow) {
+  return groups.map((group) => `SUMPRODUCT(--(K${first}:K${last}=${group.taxRate}),ROUND(L${first}:L${last}*${group[field]}/100,2))` +
+    (transportationRow && group.transportationCharges > 0 ? `+ROUND(L${transportationRow}*${group[field]}/100,2)` : '')).join('+') || '0';
 }
 
-function writeTaxSummary(ws, startRow, totals, first, last) {
+function writeTaxSummary(ws, startRow, totals, first, last, transportationRow) {
   const headers = ['Tax Rate', 'Taxable Amount', 'IGST', 'CGST', 'SGST', 'Total Tax', 'Total Amount'];
   headers.forEach((label, index) => {
     const cell = ws.getRow(startRow).getCell(index + 1);
@@ -307,10 +310,10 @@ function writeTaxSummary(ws, startRow, totals, first, last) {
     ws.getCell(`A${row}`).value = group.taxRate;
     ws.getCell(`A${row}`).numFmt = '0.##"%"';
     const formulas = [
-      [`SUMIF(K${first}:K${last},A${row},L${first}:L${last})`, group.taxableAmount],
-      [taxFormula([group], 'igstRate', first, last), group.igstAmount],
-      [taxFormula([group], 'cgstRate', first, last), group.cgstAmount],
-      [taxFormula([group], 'sgstRate', first, last), group.sgstAmount],
+      [`SUMIF(K${first}:K${last},A${row},L${first}:L${last})${transportationRow && group.transportationCharges > 0 ? `+L${transportationRow}` : ''}`, group.taxableAmount],
+      [taxFormula([group], 'igstRate', first, last, transportationRow), group.igstAmount],
+      [taxFormula([group], 'cgstRate', first, last, transportationRow), group.cgstAmount],
+      [taxFormula([group], 'sgstRate', first, last, transportationRow), group.sgstAmount],
       [`SUM(C${row}:E${row})`, group.totalTax],
       [`B${row}+F${row}`, group.totalAmount],
     ];

@@ -83,9 +83,14 @@ export function buildStandaloneEwayBill(document, transport) {
   const seller = document.SellerDtls, buyer = document.BuyerDtls;
   const from = document.DispDtls || seller, to = document.ShipDtls || buyer;
   const v = document.ValDtls;
-  if (!document.ItemList.length || document.ItemList.some(item => item.IsServc === 'Y')) throw new WhitebooksError('An e-way bill requires goods items. Service-only or mixed service invoices are not supported.');
+  // Freight is represented as a taxable service in the e-invoice, while the
+  // standalone goods movement lists only goods. Include freight with GST once
+  // in otherValue so its invoice value still reconciles.
+  const freight = document.ItemList.filter(item => item.IsServc === 'Y' && item.HsnCd === '9965' && item.PrdDesc === 'Transportation Charges');
+  const goods = document.ItemList.filter(item => !freight.includes(item));
+  if (!goods.length || goods.some(item => item.IsServc === 'Y')) throw new WhitebooksError('An e-way bill requires goods items. Service-only or mixed service invoices are not supported.');
   if (document.ItemList.some(item => item.StateCesAmt || item.StateCesNonAdvlAmt)) throw new WhitebooksError('State cess requires review before standalone e-way bill generation.');
-  const items = document.ItemList.map(item => ({
+  const items = goods.map(item => ({
     productName: item.PrdDesc.slice(0, 100), productDesc: item.PrdDesc.slice(0, 100), hsnCode: Number(item.HsnCd),
     quantity: item.Qty + (item.FreeQty || 0), qtyUnit: item.Unit, taxableAmount: item.AssAmt,
     sgstRate: item.SgstAmt ? item.GstRt / 2 : 0, cgstRate: item.CgstAmt ? item.GstRt / 2 : 0,
@@ -99,9 +104,12 @@ export function buildStandaloneEwayBill(document, transport) {
     toGstin: buyer.Gstin, toTrdName: buyer.TrdNm || buyer.LglNm,
     toAddr1: to.Addr1, toPlace: to.Loc, toPincode: to.Pin, toStateCode: Number(buyer.Stcd), actToStateCode: Number(to.Stcd),
     transactionType: document.DispDtls ? (document.ShipDtls ? 4 : 3) : (document.ShipDtls ? 2 : 1),
-    totalValue: v.AssVal, cgstValue: v.CgstVal, sgstValue: v.SgstVal, igstValue: v.IgstVal,
+    totalValue: Number((v.AssVal - freight.reduce((sum, item) => sum + item.AssAmt, 0)).toFixed(2)),
+    cgstValue: Number((v.CgstVal - freight.reduce((sum, item) => sum + item.CgstAmt, 0)).toFixed(2)),
+    sgstValue: Number((v.SgstVal - freight.reduce((sum, item) => sum + item.SgstAmt, 0)).toFixed(2)),
+    igstValue: Number((v.IgstVal - freight.reduce((sum, item) => sum + item.IgstAmt, 0)).toFixed(2)),
     cessValue: v.CesVal - nonAdvol, cessNonAdvolValue: nonAdvol, totInvValue: v.TotInvVal,
-    otherValue: Number(((v.OthChrg || 0) + (v.RndOffAmt || 0) - (v.Discount || 0)).toFixed(2)),
+    otherValue: Number(((v.OthChrg || 0) + (v.RndOffAmt || 0) - (v.Discount || 0) + freight.reduce((sum, item) => sum + item.TotItemVal, 0)).toFixed(2)),
     transMode: t.TransMode, transDistance: String(t.Distance), vehicleType: t.VehType, itemList: items,
   };
   if (from.Addr2) body.fromAddr2 = from.Addr2;

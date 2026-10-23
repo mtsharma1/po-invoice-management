@@ -2,6 +2,7 @@ import { query, withTransaction } from './db';
 import { getWebSettings } from './settings';
 import { ensureInvoiceTaxVersionColumn } from './invoiceTaxSchema';
 import { ensureInvoicePresentationColumns } from './invoicePresentationSchema';
+import { ensureInvoiceTransportationColumn } from './invoiceTransportationSchema';
 
 const defaultBankDetails = {
   AccountNo: '6811361613',
@@ -35,6 +36,7 @@ const invoiceFields = [
   'BranchName',
   'IFSCCode',
   'TotalInWords',
+  'TransportationCharges',
   'POBarcode',
   'SealNo',
   'OrderNumber',
@@ -105,10 +107,32 @@ export async function saveCustomerInvoice(payload) {
 
   const invoiceId = Number(payload?.InvoiceID || 0);
   const invoice = applyDefaultBankDetails(payload);
+  if (payload?.TransportationCharges !== undefined) {
+    invoice.TransportationCharges = normaliseTransportationCharges(payload.TransportationCharges);
+  }
   const savedBankDetails = pickBankDetails(invoice);
   await ensureInvoiceTaxVersionColumn();
   await ensureInvoicePresentationColumns();
+  await ensureInvoiceTransportationColumn();
   return withTransaction(async (run) => {
+    let updatedRegisteredCharges = false;
+    if (invoiceId) {
+      const existing = await run('SELECT InvoiceNo, IRN, TransportationCharges, AckNo, AckDate FROM tblInvoiceHeader WHERE InvoiceID = ? FOR UPDATE', [invoiceId]);
+      if (!existing.length) throw new Error('Invoice not found.');
+      const saved = existing[0];
+      if (payload?.TransportationCharges === undefined) invoice.TransportationCharges = Number(saved.TransportationCharges || 0);
+      if (Number(saved.TransportationCharges || 0) !== invoice.TransportationCharges) {
+        invoice.TotalInWords = '';
+        if (hasIrn(saved.IRN)) {
+          // A local charge adjustment does not amend the registered document.
+          invoice.IRN = saved.IRN;
+          invoice.AckNo = saved.AckNo;
+          invoice.AckDate = saved.AckDate;
+          updatedRegisteredCharges = true;
+        }
+      }
+    }
+    if (!invoiceId && invoice.TransportationCharges > 0) invoice.TotalInWords = '';
     const duplicateRows = await run(
       `SELECT InvoiceID
        FROM tblInvoiceHeader
@@ -125,7 +149,9 @@ export async function saveCustomerInvoice(payload) {
     if (invoiceId) {
       const setSql = invoiceFields.map((field) => `${field} = ?`).join(', ');
       await run(`UPDATE tblInvoiceHeader SET ${setSql} WHERE InvoiceID = ?`, [...values, invoiceId]);
-      return { invoiceId, invoiceNo, bankDetails: savedBankDetails, message: 'Invoice saved successfully.' };
+      return { invoiceId, invoiceNo, bankDetails: savedBankDetails, message: updatedRegisteredCharges
+        ? 'Invoice saved. Transportation charges and totals updated locally; the registered IRN and e-way bill were not amended.'
+        : 'Invoice saved successfully.' };
     }
 
     const placeholders = invoiceFields.map(() => '?').join(', ');
@@ -163,6 +189,7 @@ function blankInvoice(settings) {
     BranchName: defaultIfBlank(settings.branchName, defaultBankDetails.BranchName),
     IFSCCode: defaultIfBlank(settings.ifscCode, defaultBankDetails.IFSCCode),
     TotalInWords: '',
+    TransportationCharges: 0,
     InvoiceNote: '',
     BeneficiaryName: 'TEAKWOOD',
     POBarcode: '',
@@ -179,6 +206,7 @@ function blankInvoice(settings) {
 function applyDefaultBankDetails(invoice = {}) {
   return {
     ...invoice,
+    TransportationCharges: invoice.TransportationCharges ?? 0,
     InvoiceNote: invoice.InvoiceNote ?? '',
     BeneficiaryName: defaultIfBlank(invoice.BeneficiaryName, 'TEAKWOOD'),
     AccountNo: defaultIfBlank(invoice.AccountNo, defaultBankDetails.AccountNo),
@@ -205,6 +233,7 @@ function defaultIfBlank(value, fallback) {
 }
 
 function normaliseField(field, value) {
+  if (field === 'TransportationCharges') return normaliseTransportationCharges(value);
   if (['InvoiceDate', 'AckDate', 'OrderDate'].includes(field)) {
     return normaliseDate(value);
   }
@@ -215,6 +244,19 @@ function normaliseField(field, value) {
   if (field === 'InterStateTax') return value ? 1 : 0;
   if (value === undefined || value === '') return nullableField(field) ? null : value;
   return String(value);
+}
+
+function hasIrn(value) {
+  return !['', 'null', 'undefined'].includes(String(value ?? '').trim().toLowerCase());
+}
+
+function normaliseTransportationCharges(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return 0;
+  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) throw new Error('Transportation charges must be a non-negative amount with at most two decimal places.');
+  const amount = Number(text);
+  if (!Number.isFinite(amount) || amount > 999999999999.99) throw new Error('Transportation charges are too large.');
+  return amount;
 }
 
 function nullableField(field) {

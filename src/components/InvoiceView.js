@@ -102,6 +102,7 @@ export default function InvoiceView({ invoice }) {
           </table>
         </div> : null}
         <div className="totals-box">
+          {totals.transportationCharges > 0 ? <div><strong>TRANSPORTATION CHARGES</strong><span /><span>{money(totals.transportationCharges)}</span></div> : null}
           <div><strong>TAXABLE AMOUNT</strong><span /><span>{money(totals.taxableAmount)}</span></div>
           {totals.isInterState ? (
             <>

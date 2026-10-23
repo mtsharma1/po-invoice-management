@@ -26,16 +26,26 @@ export function roundTaxMoney(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
+export function transportationChargeLine(header) {
+  const amount = roundTaxMoney(header?.TransportationCharges);
+  if (!(amount > 0)) return null;
+  return { VendorArticleName: 'Transportation Charges', HSNCode: '9965', Qty: 1, Rate: amount, Amount: amount };
+}
+
 export function invoiceTaxSummary(header, lines) {
   const groups = new Map();
-  for (const line of lines) {
+  const transportation = transportationChargeLine(header);
+  for (const line of transportation ? [...lines, transportation] : lines) {
     const rates = lineTaxRates(header, line);
     const key = `${rates.igstRate}/${rates.cgstRate}/${rates.sgstRate}`;
-    const group = groups.get(key) || { ...rates, taxableAmount: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0 };
+    const group = groups.get(key) || { ...rates, taxableAmount: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, transportationCharges: 0 };
     const amount = roundTaxMoney(line.Amount);
     group.taxableAmount = roundTaxMoney(group.taxableAmount + amount);
     for (const tax of ['igst', 'cgst', 'sgst']) {
       group[`${tax}Amount`] = roundTaxMoney(group[`${tax}Amount`] + roundTaxMoney(amount * rates[`${tax}Rate`] / 100));
+    }
+    if (line === transportation) {
+      group.transportationCharges = amount;
     }
     group.totalTax = roundTaxMoney(group.igstAmount + group.cgstAmount + group.sgstAmount);
     group.totalAmount = roundTaxMoney(group.taxableAmount + group.totalTax);

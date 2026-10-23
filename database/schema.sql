@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS tblInvoiceHeader (
   TotalInWords TEXT NULL,
   InvoiceNote TEXT NULL,
   BeneficiaryName VARCHAR(255) NULL,
+  TransportationCharges DECIMAL(18,2) NOT NULL DEFAULT 0,
   POBarcode VARCHAR(255) NULL,
   SealNo VARCHAR(100) NULL,
   OrderNumber VARCHAR(100) NULL,

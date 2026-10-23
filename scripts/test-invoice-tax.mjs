@@ -148,12 +148,14 @@ assert.equal(tax.usesItemTaxDetails({ TaxDetailsVersion: 1, InvoiceDate: '2026-0
 let statements = [];
 globalThis.__invoiceTaxSaveRun = async (sql, values) => {
   statements.push({ sql, values });
+  if (sql.startsWith('SELECT InvoiceNo, IRN, TransportationCharges')) return [{ InvoiceNo: 'OLD', TransportationCharges: 0 }];
   if (sql.includes('SELECT InvoiceID')) return [];
   return { insertId: 99, affectedRows: 1 };
 };
 const customer = await load(`
   const ensureInvoiceTaxVersionColumn = async () => {};
   const ensureInvoicePresentationColumns = async () => {};
+  const ensureInvoiceTransportationColumn = async () => {};
   const withTransaction = async (callback) => callback(globalThis.__invoiceTaxSaveRun);
   ${stripImports(await readFile('src/lib/customerInvoice.js', 'utf8'))}
 `);
