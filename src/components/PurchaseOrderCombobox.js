@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-export default function PurchaseOrderCombobox({ id, purchaseOrders, value = '', onChange, disabled = false }) {
+export default function PurchaseOrderCombobox({ id, purchaseOrders, value = '', onChange, disabled = false, emptyLabel = 'All purchase orders' }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(-1);
   const listRef = useRef(null);
   const search = query.trim().toLowerCase();
   const options = [
-    ...(!search ? [{ value: '', label: 'All purchase orders' }] : []),
+    ...(!search ? [{ value: '', label: emptyLabel }] : []),
     ...purchaseOrders.filter(po => String(po.POBarcode ?? '').toLowerCase().includes(search))
       .map(po => ({ value: po.POBarcode, label: po.POBarcode })),
   ];
@@ -44,7 +44,7 @@ export default function PurchaseOrderCombobox({ id, purchaseOrders, value = '', 
     <input id={id} type="text" role="combobox" autoComplete="off"
       aria-autocomplete="list" aria-expanded={open && !disabled} aria-controls={`${id}-list`}
       aria-activedescendant={open && activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}
-      placeholder={open ? 'Type to search purchase orders…' : 'All purchase orders'}
+      placeholder={open ? 'Type to search purchase orders…' : emptyLabel}
       value={open ? query : value} disabled={disabled}
       onFocus={() => { setOpen(true); setQuery(''); setActive(-1); }}
       onClick={() => setOpen(true)} onBlur={close} onKeyDown={keyDown}

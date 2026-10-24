@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { dateText, qty, text } from '@/lib/format';
 import ActionIcon from './ActionIcon';
+import PurchaseOrderCombobox from './PurchaseOrderCombobox';
 
 export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, rows }) {
   const router = useRouter();
@@ -85,20 +86,16 @@ export default function ShellOrderWorkbench({ poOptions, selectedPO, poContext, 
         </div>
 
         <div className="dispatch-selector-row">
-          <label className="dispatch-modern-field dispatch-po-selector">
-            <span>Purchase order</span>
+          <div className="dispatch-modern-field dispatch-po-selector">
+            <label htmlFor="shell-po-search">Purchase order</label>
             <div className="dispatch-po-control-row">
-              <select value={selectedPO} onChange={(event) => selectPO(event.target.value)}>
-                <option value="">Select PO Number</option>
-                {poOptions.map((po) => (
-                  <option key={po.POBarcode} value={po.POBarcode}>{po.POBarcode}</option>
-                ))}
-              </select>
+              <PurchaseOrderCombobox id="shell-po-search" purchaseOrders={poOptions} value={selectedPO}
+                onChange={selectPO} disabled={isPending} emptyLabel="Select PO Number" />
               <button className="dispatch-po-clear-button" type="button" onClick={clearFilter} disabled={!selectedPO} title="Clear purchase order">
                 <ActionIcon name="reset" /> Clear
               </button>
             </div>
-          </label>
+          </div>
 
           <div className="dispatch-context-item">
             <span>Party</span>

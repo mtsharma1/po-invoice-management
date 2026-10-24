@@ -4517,6 +4517,10 @@ table tbody td,
   gap: 8px;
 }
 .dispatch-po-control-row select { padding-right: 13px; }
+.dispatch-command-panel { overflow: visible; }
+.dispatch-po-selector > label { color: #374151; font-size: 14px; font-weight: 700; }
+.dispatch-po-control-row .master-po-combobox { min-width: 0; }
+.dispatch-po-control-row .master-po-combobox input { padding-right: 30px; }
 .dispatch-po-clear-button {
   display: inline-flex;
   align-items: center;

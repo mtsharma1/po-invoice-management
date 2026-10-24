@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { dateText, money, qty, text } from '@/lib/format';
 import ActionIcon from './ActionIcon';
+import PurchaseOrderCombobox from './PurchaseOrderCombobox';
 import { validateDispatchQuantity } from '@/lib/dispatchQuantity';
 
 export default function DispatchWorkbench({ poOptions, selectedPO, poContext, rows, mode }) {
@@ -220,20 +221,16 @@ export default function DispatchWorkbench({ poOptions, selectedPO, poContext, ro
         </div>
 
         <div className="dispatch-selector-row">
-          <label className="dispatch-modern-field dispatch-po-selector">
-            <span>Purchase order</span>
+          <div className="dispatch-modern-field dispatch-po-selector">
+            <label htmlFor="dispatch-po-search">Purchase order</label>
             <div className="dispatch-po-control-row">
-              <select value={selectedPO} onChange={(event) => selectPO(event.target.value)}>
-                <option value="">Select PO Number</option>
-                {poOptions.map((po) => (
-                  <option key={po.POBarcode} value={po.POBarcode}>{po.POBarcode}</option>
-                ))}
-              </select>
+              <PurchaseOrderCombobox id="dispatch-po-search" purchaseOrders={poOptions} value={selectedPO}
+                onChange={selectPO} disabled={isPending} emptyLabel="Select PO Number" />
               <button className="dispatch-po-clear-button" type="button" onClick={clearFilter} disabled={!selectedPO} title="Clear purchase order">
                 <ActionIcon name="reset" /> Clear
               </button>
             </div>
-          </label>
+          </div>
 
           <div className="dispatch-context-item">
             <span>Party</span>
