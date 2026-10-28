@@ -1,11 +1,12 @@
-// All invoices use the current presentation and item-tax rules, including
-// records created before TaxDetailsVersion was introduced.
+import { buyingTaxRates, usesBuyingTax } from './buyingTax';
+// Preserve existing presentation for all invoices; version 2 selects PO Buying Tax rates.
 export function usesItemTaxDetails() {
   return true;
 }
 
 // Preserve the application's existing switch: selected means CGST + SGST.
 export function lineTaxRates(header, line) {
+  if (usesBuyingTax(header)) return buyingTaxRates(line);
   const split = Number(header?.InterStateTax || 0) !== 0;
   const positive = (value, fallback) => Number(value) > 0 ? Number(value) : fallback;
   let cgstRate = split ? positive(header?.CGST, 9) : 0;
@@ -26,19 +27,24 @@ export function roundTaxMoney(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
-export function transportationChargeLine(header) {
+export function transportationChargeLine(header, lines = []) {
   const amount = roundTaxMoney(header?.TransportationCharges);
   if (!(amount > 0)) return null;
-  return { VendorArticleName: 'Transportation Charges', HSNCode: '9965', Qty: 1, Rate: amount, Amount: amount };
+  const split = usesBuyingTax(header) && lines.length > 0 && lines.every(line => buyingTaxRates(line).igstRate === 0);
+  return { BuyingTaxCGST: split ? 9 : 0, BuyingTaxSGST: split ? 9 : 0, BuyingTaxIGST: split ? 0 : 18, VendorArticleName: 'Transportation Charges', HSNCode: '9965', Qty: 1, Rate: amount, Amount: amount };
 }
 
 export function invoiceTaxSummary(header, lines) {
   const groups = new Map();
-  const transportation = transportationChargeLine(header);
-  for (const line of transportation ? [...lines, transportation] : lines) {
+  const transportation = transportationChargeLine(header, lines);
+  for (const [index, line] of (transportation ? [...lines, transportation] : lines).entries()) {
     const rates = lineTaxRates(header, line);
     const key = `${rates.igstRate}/${rates.cgstRate}/${rates.sgstRate}`;
     const group = groups.get(key) || { ...rates, taxableAmount: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, transportationCharges: 0 };
+    if (usesBuyingTax(header)) {
+      group.lineIndexes ||= [];
+      if (line !== transportation) group.lineIndexes.push(index);
+    }
     const amount = roundTaxMoney(line.Amount);
     group.taxableAmount = roundTaxMoney(group.taxableAmount + amount);
     for (const tax of ['igst', 'cgst', 'sgst']) {

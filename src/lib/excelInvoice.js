@@ -1,3 +1,4 @@
+import { usesBuyingTax } from './buyingTax';
 import { dateText, dateTimeText, text } from './format.js';
 import { invoiceQrBuffer } from './invoiceQr.js';
 import { lineTaxRates, usesItemTaxDetails } from './invoiceTax.js';
@@ -78,7 +79,7 @@ export async function buildInvoiceWorkbook({ header, lines, totals }) {
   if (summaryStart > totalsStart + 1) {
     mergeValue(ws, `A${totalsStart + 1}:G${summaryStart - 1}`, '', 'left');
   }
-  writeTaxSummary(ws, summaryStart, totals, firstLineRow, lastLineRow, totalsLayout.transportationRow);
+  writeTaxSummary(ws, summaryStart, totals, firstLineRow, lastLineRow, totalsLayout.transportationRow, usesBuyingTax(header));
 
   const printLastRow = signatureEnd + 1;
   outline(ws, 1, totalsLayout.wordsRow - 1);
@@ -216,9 +217,9 @@ function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
   const transportationRow = totals.transportationCharges > 0 ? startRow + 1 : null;
   const taxableRow = startRow + (transportationRow ? 2 : 1);
   const firstTaxRow = taxableRow + 1;
-  const taxRowCount = totals.isInterState ? 2 : 1;
+  const taxRowCount = totals.hasMixedTaxTypes ? 3 : totals.isInterState ? 2 : 1;
   const lastTaxRow = firstTaxRow + taxRowCount - 1;
-  const roundRow = lastTaxRow + 1;
+  const roundRow = Math.max(lastTaxRow + 1, taxableRow + totals.taxSummary.length);
   const grandRow = roundRow + 1;
   const wordsRow = Math.max(grandRow, taxableRow + totals.taxSummary.length) + 2;
 
@@ -236,20 +237,28 @@ function writeTotals(ws, startRow, totals, header, firstLineRow, lastLineRow) {
 
   if (transportationRow) setFormulaTotalLine(ws, transportationRow, 'TRANSPORTATION CHARGES', String(totals.transportationCharges), totals.transportationCharges);
   setFormulaTotalLine(ws, taxableRow, 'TAXABLE AMOUNT', `SUM(L${firstLineRow}:L${lastLineRow})${transportationRow ? `+L${transportationRow}` : ''}`, totals.taxableAmount);
-  if (totals.isInterState) {
+  if (totals.isInterState || totals.hasMixedTaxTypes) {
     setTaxLine(ws, firstTaxRow, 'CGST', totals.cgstRate, taxableRow, totals.cgstAmount, taxFormula(totals.taxSummary, 'cgstRate', firstLineRow, lastLineRow, transportationRow));
     setTaxLine(ws, firstTaxRow + 1, 'SGST', totals.sgstRate, taxableRow, totals.sgstAmount, taxFormula(totals.taxSummary, 'sgstRate', firstLineRow, lastLineRow, transportationRow));
   } else {
     setTaxLine(ws, firstTaxRow, 'IGST', totals.igstRate, taxableRow, totals.igstAmount, taxFormula(totals.taxSummary, 'igstRate', firstLineRow, lastLineRow, transportationRow));
   }
+  if (totals.hasMixedTaxTypes) setTaxLine(ws, firstTaxRow + 2, 'IGST', null, taxableRow, totals.igstAmount, taxFormula(totals.taxSummary, 'igstRate', firstLineRow, lastLineRow, transportationRow));
+  if (totals.hideTaxTotals) {
+    for (let row = firstTaxRow; row <= lastTaxRow; row++) {
+      ws.getCell(`K${row}`).value = '';
+    }
+  }
+  const groupTaxSum = `SUM(F${grandRow - totals.taxSummary.length + 1}:F${grandRow})`;
+  const buyingRawTotal = `L${taxableRow}+${groupTaxSum}`;
   setFormulaTotalLine(
     ws,
     roundRow,
     'ROUND OFF',
-    `ROUND(SUM(L${taxableRow}:L${lastTaxRow}),0)-SUM(L${taxableRow}:L${lastTaxRow})`,
+    usesBuyingTax(header) ? `ROUND(${buyingRawTotal},0)-(${buyingRawTotal})` : `ROUND(SUM(L${taxableRow}:L${lastTaxRow}),0)-SUM(L${taxableRow}:L${lastTaxRow})`,
     totals.roundOff
   );
-  setFormulaTotalLine(ws, grandRow, 'GRAND TOTAL', `SUM(L${taxableRow}:L${roundRow})`, totals.grandTotal, true);
+  setFormulaTotalLine(ws, grandRow, 'GRAND TOTAL', usesBuyingTax(header) ? `${buyingRawTotal}+L${roundRow}` : `SUM(L${taxableRow}:L${roundRow})`, totals.grandTotal, true);
 
   mergeValue(ws, `A${wordsRow}:L${wordsRow}`, text(header.TotalInWords), 'center', true, 9);
   ws.getCell(`A${wordsRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F3F5' } };
@@ -290,11 +299,11 @@ function setTaxLine(ws, rowNumber, label, rate, taxableRow, amount, formula) {
 }
 
 function taxFormula(groups, field, first, last, transportationRow) {
-  return groups.map((group) => `SUMPRODUCT(--(K${first}:K${last}=${group.taxRate}),ROUND(L${first}:L${last}*${group[field]}/100,2))` +
+  return groups.map((group) => (group.lineIndexes ? `SUM(${group.lineIndexes.map(index => `ROUND(L${first + index}*${group[field]}/100,2)`).join(',') || '0'})` : `SUMPRODUCT(--(K${first}:K${last}=${group.taxRate}),ROUND(L${first}:L${last}*${group[field]}/100,2))`) +
     (transportationRow && group.transportationCharges > 0 ? `+ROUND(L${transportationRow}*${group[field]}/100,2)` : '')).join('+') || '0';
 }
 
-function writeTaxSummary(ws, startRow, totals, first, last, transportationRow) {
+function writeTaxSummary(ws, startRow, totals, first, last, transportationRow, buyingTax = false) {
   const headers = ['Tax Rate', 'Taxable Amount', 'IGST', 'CGST', 'SGST', 'Total Tax', 'Total Amount'];
   headers.forEach((label, index) => {
     const cell = ws.getRow(startRow).getCell(index + 1);
@@ -310,7 +319,7 @@ function writeTaxSummary(ws, startRow, totals, first, last, transportationRow) {
     ws.getCell(`A${row}`).value = group.taxRate;
     ws.getCell(`A${row}`).numFmt = '0.##"%"';
     const formulas = [
-      [`SUMIF(K${first}:K${last},A${row},L${first}:L${last})${transportationRow && group.transportationCharges > 0 ? `+L${transportationRow}` : ''}`, group.taxableAmount],
+      [`${buyingTax ? `SUM(${(group.lineIndexes || []).map(index => `L${first + index}`).join(',') || '0'})` : `SUMIF(K${first}:K${last},A${row},L${first}:L${last})`}${transportationRow && group.transportationCharges > 0 ? `+L${transportationRow}` : ''}`, group.taxableAmount],
       [taxFormula([group], 'igstRate', first, last, transportationRow), group.igstAmount],
       [taxFormula([group], 'cgstRate', first, last, transportationRow), group.cgstAmount],
       [taxFormula([group], 'sgstRate', first, last, transportationRow), group.sgstAmount],

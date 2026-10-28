@@ -1,3 +1,4 @@
+import { usesBuyingTax } from './buyingTax';
 import { query } from './db';
 import { asNumber } from './format';
 import { amountInWords } from './numberWords';
@@ -85,6 +86,7 @@ export async function getInvoice(invoiceNo) {
        pd.Colour,
        pd.Size,
        SUM(COALESCE(vd.DispatchQty, pd.Quantity, 0)) AS Qty,
+       ${usesBuyingTax(header) ? 'MAX(pd.BuyingTaxCGST) AS BuyingTaxCGST, MAX(pd.BuyingTaxIGST) AS BuyingTaxIGST, MAX(pd.BuyingTaxSGST) AS BuyingTaxSGST,' : ''}
        MAX(COALESCE(pd.MRP, 0)) AS MRP,
        MAX(COALESCE(pd.ListPriceFOBTransportExcise, 0)) AS Rate,
        SUM(COALESCE(vd.DispatchQty, pd.Quantity, 0)) * MAX(COALESCE(pd.ListPriceFOBTransportExcise, 0)) AS Amount,
@@ -130,7 +132,7 @@ export function calculateInvoiceTotals(header, lines) {
   const taxSummary = invoiceTaxSummary(header, lines);
   const sum = (field) => roundMoney(taxSummary.reduce((total, group) => total + group[field], 0));
   const taxableAmount = sum('taxableAmount');
-  const isInterState = asNumber(header?.InterStateTax) !== 0;
+  const isInterState = usesBuyingTax(header) ? taxSummary.every(group => group.igstRate === 0) : asNumber(header?.InterStateTax) !== 0;
   const commonRate = (field) => taxSummary.length === 1 ? taxSummary[0][field] : null;
   const igstRate = commonRate('igstRate');
   const sgstRate = commonRate('sgstRate');
@@ -144,6 +146,8 @@ export function calculateInvoiceTotals(header, lines) {
 
   return {
     taxSummary,
+    hideTaxTotals: usesBuyingTax(header) && taxSummary.length > 1,
+    hasMixedTaxTypes: usesBuyingTax(header) && taxSummary.some(group => group.igstRate > 0) && taxSummary.some(group => group.cgstRate > 0 || group.sgstRate > 0),
     transportationCharges: roundMoney(header?.TransportationCharges),
     totalQty,
     taxableAmount,

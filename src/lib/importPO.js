@@ -1,3 +1,5 @@
+import { buyingTaxRates } from './buyingTax';
+import { ensureBuyingTaxColumns } from './buyingTaxSchema';
 import { query, withTransaction } from './db';
 import { ensurePOConsigneeNameColumn, ensurePOImportDateColumn } from './poSchema';
 
@@ -39,6 +41,8 @@ const detailColumns = [
   'EstimatedDeliveryDate',
   'TaxBCD',
   'TaxBCDAmount',
+  'BuyingTaxCGST',
+  'BuyingTaxSGST',
   'BuyingTaxIGST',
   'BuyingTaxIGSTAmount',
   'TaxSWT',
@@ -67,7 +71,6 @@ const ignoredWorkbookColumns = new Set([
   'FOBAmount',
   'TaxBCD',
   'TaxBCDAmount',
-  'BuyingTaxIGST',
   'BuyingTaxIGSTAmount',
   'TaxSWT',
   'TaxSWTAmount',
@@ -80,7 +83,6 @@ const ignoredNumericWorkbookColumns = new Set([
   'FOBAmount',
   'TaxBCD',
   'TaxBCDAmount',
-  'BuyingTaxIGST',
   'BuyingTaxIGSTAmount',
   'TaxSWT',
   'TaxSWTAmount',
@@ -111,6 +113,8 @@ const detailMap = {
   EstimatedDeliveryDate: ['Estimated Delivery Date'],
   TaxBCD: ['Tax BCD'],
   TaxBCDAmount: ['Tax BCD Amount'],
+  BuyingTaxCGST: ['Buying Tax CGST'],
+  BuyingTaxSGST: ['Buying Tax SGST'],
   BuyingTaxIGST: ['Buying Tax IGST'],
   BuyingTaxIGSTAmount: ['Buying Tax IGST Amount'],
   TaxSWT: ['Tax SWT'],
@@ -124,6 +128,7 @@ const detailMap = {
 };
 
 const requiredWorkbookDetailColumns = [
+  'BuyingTaxCGST', 'BuyingTaxIGST', 'BuyingTaxSGST',
   'StyleId',
   'HSNCode',
   'Brand',
@@ -191,8 +196,9 @@ export async function getImportScreenData(sessionId) {
 export async function stagePurchaseOrderWorkbook(sessionId, fileBuffer) {
   const { header, details } = await parsePurchaseOrderWorkbook(fileBuffer);
 
+  await ensureWebImportTables();
+  await ensureBuyingTaxColumns('webTmpPODetails');
   return withTransaction(async (run) => {
-    await ensureWebImportTables(run);
     const existing = await run('SELECT POBarcode FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1', [header.POBarcode]);
     if (existing.length) {
       throw new Error('The selected purchase order has already been imported.');
@@ -225,10 +231,11 @@ export async function stagePurchaseOrderWorkbook(sessionId, fileBuffer) {
 }
 
 export async function saveStagedPurchaseOrder(sessionId) {
-  await Promise.all([ensurePOImportDateColumn(), ensurePOConsigneeNameColumn()]);
+  await Promise.all([ensurePOImportDateColumn(), ensurePOConsigneeNameColumn(), ensureBuyingTaxColumns()]);
 
+  await ensureWebImportTables();
+  await ensureBuyingTaxColumns('webTmpPODetails');
   return withTransaction(async (run) => {
-    await ensureWebImportTables(run);
     const headers = await run('SELECT * FROM webTmpPOHeaders WHERE SessionId = ? LIMIT 1', [sessionId]);
     const header = headers[0];
     if (!header?.POBarcode) throw new Error('Please import PO before saving to database.');
@@ -238,6 +245,8 @@ export async function saveStagedPurchaseOrder(sessionId) {
       throw new Error('The selected purchase order has already been saved to database.');
     }
 
+    const stagedTaxes = await run('SELECT BuyingTaxCGST, BuyingTaxIGST, BuyingTaxSGST FROM webTmpPODetails WHERE SessionId = ?', [sessionId]);
+    for (const line of stagedTaxes) buyingTaxRates(line);
     const detailCountRows = await run(
       'SELECT COUNT(*) AS rowCount FROM webTmpPODetails WHERE SessionId = ?',
       [sessionId]
@@ -279,7 +288,7 @@ export async function saveStagedPurchaseOrder(sessionId) {
 
 export async function importPurchaseOrderWorkbook(fileBuffer) {
   const { header, details } = await parsePurchaseOrderWorkbook(fileBuffer);
-  await Promise.all([ensurePOImportDateColumn(), ensurePOConsigneeNameColumn()]);
+  await Promise.all([ensurePOImportDateColumn(), ensurePOConsigneeNameColumn(), ensureBuyingTaxColumns()]);
 
   return withTransaction(async (run) => {
     const existing = await run('SELECT POBarcode FROM tblPOHeaders WHERE POBarcode = ? LIMIT 1', [header.POBarcode]);
@@ -641,6 +650,9 @@ function readDetailRows(worksheet, headerRow, columnMap, poBarcode) {
       }
     }
 
+    try { buyingTaxRates(detail); }
+    catch (error) { issues.push(importIssue({ worksheet: worksheet.name, row, field: 'Buying Tax CGST / IGST / SGST', reason: error.message })); }
+
     const rawDeliveryDate = getMappedCell(worksheet, row, columnMap, 'EstimatedDeliveryDate');
     if (rawDeliveryDate && !toSqlDate(rawDeliveryDate)) {
       issues.push(importIssue({
@@ -720,6 +732,8 @@ function numericColumn(column) {
     'LandingPrice',
     'TaxBCD',
     'TaxBCDAmount',
+    'BuyingTaxCGST',
+    'BuyingTaxSGST',
     'BuyingTaxIGST',
     'BuyingTaxIGSTAmount',
     'TaxSWT',

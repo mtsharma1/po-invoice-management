@@ -1,3 +1,4 @@
+import { usesBuyingTax } from './buyingTax';
 import { getInvoice, listInvoices } from './invoices';
 import { getEwayBillTransport } from './ewayBillTransport';
 import { lineTaxRates, usesItemTaxDetails, transportationChargeLine } from './invoiceTax';
@@ -200,11 +201,11 @@ function buildDocument(invoice, draft) {
   const includeFreeQuantity = draft.outputOptions?.includeFreeQuantity !== false;
   const itemList = invoice.lines.map((line, index) => buildItem(line, index,
     usesItemTaxDetails(invoice.header) ? lineTaxRates(invoice.header, line).taxRate : invoiceGstRate(invoice.header),
-    useIgst, withoutPayment, includeFreeQuantity));
-  const transportation = transportationChargeLine(invoice.header);
+    useIgst, withoutPayment, includeFreeQuantity, usesBuyingTax(invoice.header) ? lineTaxRates(invoice.header, line) : null));
+  const transportation = transportationChargeLine(invoice.header, invoice.lines);
   if (transportation) {
     itemList.push({ ...buildItem(transportation, itemList.length, lineTaxRates(invoice.header, transportation).taxRate,
-      useIgst, withoutPayment, includeFreeQuantity), IsServc: 'Y' });
+      useIgst, withoutPayment, includeFreeQuantity, usesBuyingTax(invoice.header) ? lineTaxRates(invoice.header, transportation) : null), IsServc: 'Y' });
   }
   const assVal = sumMoney(itemList, 'AssAmt');
   const igstVal = sumMoney(itemList, 'IgstAmt');
@@ -214,7 +215,7 @@ function buildDocument(invoice, draft) {
   const stCesVal = sumMoney(itemList, 'StateCesAmt');
   const itemTotal = roundMoney(itemList.reduce((sum, item) => sum + number(item.TotItemVal), 0));
   const storedGrandTotal = number(invoice.header.GrandTotal);
-  const totalInvVal = !transportation && storedGrandTotal > 0 && Math.abs(storedGrandTotal - itemTotal) <= 1
+  const totalInvVal = !usesBuyingTax(invoice.header) && !transportation && storedGrandTotal > 0 && Math.abs(storedGrandTotal - itemTotal) <= 1
     ? roundMoney(storedGrandTotal)
     : Math.round(itemTotal);
   const roundOff = roundMoney(totalInvVal - itemTotal);
@@ -308,15 +309,15 @@ function buildDocument(invoice, draft) {
   return document;
 }
 
-function buildItem(line, index, gstRate, useIgst, withoutPayment, includeFreeQuantity) {
+function buildItem(line, index, gstRate, useIgst, withoutPayment, includeFreeQuantity, rates = null) {
   const qty = roundQuantity(line.Qty);
   const unitPrice = roundMoney(line.Rate);
   const totalAmount = roundMoney(number(line.Amount) || qty * unitPrice);
   const taxableAmount = totalAmount;
-  const taxableRate = GST_RATES.has(number(gstRate)) ? number(gstRate) : 18;
-  const igstAmount = !withoutPayment && useIgst ? percentageMoney(taxableAmount, taxableRate, 100) : 0;
-  const cgstAmount = !withoutPayment && !useIgst ? percentageMoney(taxableAmount, taxableRate, 200) : 0;
-  const sgstAmount = !withoutPayment && !useIgst ? percentageMoney(taxableAmount, taxableRate, 200) : 0;
+  const taxableRate = rates ? rates.taxRate : GST_RATES.has(number(gstRate)) ? number(gstRate) : 18;
+  const igstAmount = withoutPayment ? 0 : rates ? percentageMoney(taxableAmount, rates.igstRate, 100) : useIgst ? percentageMoney(taxableAmount, taxableRate, 100) : 0;
+  const cgstAmount = withoutPayment ? 0 : rates ? percentageMoney(taxableAmount, rates.cgstRate, 100) : !useIgst ? percentageMoney(taxableAmount, taxableRate, 200) : 0;
+  const sgstAmount = withoutPayment ? 0 : rates ? percentageMoney(taxableAmount, rates.sgstRate, 100) : !useIgst ? percentageMoney(taxableAmount, taxableRate, 200) : 0;
   return {
     SlNo: String(index + 1),
     PrdDesc: clean(line.VendorArticleName || line.SKUCode || line.StyleId).slice(0, 300),

@@ -6,7 +6,8 @@ import { pathToFileURL } from 'node:url';
 const require = createRequire(import.meta.url);
 const load = source => import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const strip = source => source.replace(/^import .*;\r?$/gm, '');
-const taxSource = await readFile('src/lib/invoiceTax.js', 'utf8');
+const buyingSource = await readFile('src/lib/buyingTax.js', 'utf8');
+const taxSource = buyingSource + '\n' + (await readFile('src/lib/invoiceTax.js', 'utf8')).replace(/^import .*;\r?$/gm, '');
 const formatSource = await readFile('src/lib/format.js', 'utf8');
 const tax = await load(taxSource);
 const invoices = await load(`${formatSource}\n${taxSource}\n${strip(await readFile('src/lib/invoices.js', 'utf8'))}`);
@@ -88,6 +89,7 @@ globalThis.__freightRun = async (sql, args) => {
   return { insertId: 99, affectedRows: 1 };
 };
 const customer = await load(`
+  const ensureBuyingTaxColumns = async () => {};
   const ensureInvoiceTaxVersionColumn = async () => {};
   const ensureInvoicePresentationColumns = async () => {};
   const ensureInvoiceTransportationColumn = async () => {};

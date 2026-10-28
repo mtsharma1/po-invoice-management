@@ -37,16 +37,6 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  function updateInterStateTax(checked) {
-    setForm((current) => ({
-      ...current,
-      InterStateTax: checked ? 1 : 0,
-      SGST: checked ? 9 : 0,
-      CGST: checked ? 9 : 0,
-      IGSTRate: checked ? 0 : 18,
-    }));
-  }
-
   function runMainSearch() {
     const params = new URLSearchParams();
     if (mainSearchText.trim()) params.set('invoiceNo', mainSearchText.trim());
@@ -171,17 +161,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
 
             <div className="invoice-tax-fields">
               <FormInput label="Invoice Date" type="date" value={dateInput(form.InvoiceDate)} onChange={(value) => updateField('InvoiceDate', value)} />
-              <FormInput label="IGST Rate" type="number" value={form.IGSTRate} onChange={(value) => updateField('IGSTRate', value)} />
-              <FormInput label="SGST Rate" type="number" value={form.SGST} onChange={(value) => updateField('SGST', value)} />
-              <FormInput label="CGST Rate" type="number" value={form.CGST} onChange={(value) => updateField('CGST', value)} />
-              <label className="invoice-check">
-                <input
-                  type="checkbox"
-                  checked={Boolean(form.InterStateTax)}
-                  onChange={(event) => updateInterStateTax(event.target.checked)}
-                />
-                <span>Inter State Tax</span>
-              </label>
+              <p>GST is calculated from PO line Buying Tax rates for new invoices.</p>
             </div>
 
             <div className="invoice-qr-box">
@@ -369,20 +349,7 @@ function resizeTextarea(textarea) {
 
 function normaliseInvoice(invoice) {
   const source = invoice || {};
-  const useCgstSgst = Number(source.InterStateTax || 0) !== 0;
-  return {
-    ...source,
-    TransportationCharges: source.TransportationCharges ?? 0,
-    InterStateTax: useCgstSgst ? 1 : 0,
-    SGST: useCgstSgst ? positiveRate(source.SGST, 9) : 0,
-    CGST: useCgstSgst ? positiveRate(source.CGST, 9) : 0,
-    IGSTRate: useCgstSgst ? 0 : positiveRate(source.IGSTRate, 18),
-  };
-}
-
-function positiveRate(value, fallback) {
-  const rate = Number(value || 0);
-  return Number.isFinite(rate) && rate > 0 ? rate : fallback;
+  return { ...source, TransportationCharges: source.TransportationCharges ?? 0 };
 }
 
 function dateInput(value) {
