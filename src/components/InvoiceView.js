@@ -94,7 +94,7 @@ export default function InvoiceView({ invoice }) {
             <caption>Tax summary</caption>
             <thead><tr>{['Tax Rate', 'Taxable Amount', 'IGST', 'CGST', 'SGST', 'Total Tax', 'Total Amount'].map((label) => <th key={label}>{label}</th>)}</tr></thead>
             <tbody>{(totals.taxSummary || []).map((group) => (
-              <tr key={group.taxRate}>
+              <tr key={`${group.igstRate}/${group.cgstRate}/${group.sgstRate}`}>
                 <td>{group.taxRate}%</td>
                 {[group.taxableAmount, group.igstAmount, group.cgstAmount, group.sgstAmount, group.totalTax, group.totalAmount].map((amount, index) => <td key={index}>{money(amount)}</td>)}
               </tr>

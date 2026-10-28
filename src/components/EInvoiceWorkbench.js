@@ -288,8 +288,8 @@ export default function EInvoiceWorkbench({ rows, initialDraft, initialValidatio
             </Section>
 
             <div className="einvoice-party-grid">
-              <PartyEditor title="Seller details" section="seller" party={draft.seller} update={update} errorsFor={errorsFor} />
-              <PartyEditor title="Buyer details" subtitle="Always populated from Consignee Address" section="buyer" party={draft.buyer} update={update} errorsFor={errorsFor} includePos />
+              <PartyEditor title="Bill From" section="seller" party={draft.seller} update={update} errorsFor={errorsFor} />
+              <PartyEditor title="Bill To" subtitle="Always populated from Bill To Address" section="buyer" party={draft.buyer} update={update} errorsFor={errorsFor} includePos />
             </div>
 
             <Section title="Additional locations" subtitle="Dispatch-from and ship-to sections are included only when enabled.">

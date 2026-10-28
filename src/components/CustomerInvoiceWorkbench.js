@@ -194,7 +194,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
               title="CONSIGNEE NAME"
               name={form.ConsigneeName}
               address={form.ConsigneeAddress}
-              addressTitle="CONSIGNEE ADDRESS"
+              addressTitle="BILL TO ADDRESS"
               onName={(value) => updateField('ConsigneeName', value)}
               onAddress={(value) => updateField('ConsigneeAddress', value)}
             />
@@ -202,7 +202,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
               title="DELIVERED TO NAME"
               name={form.DeliveredToName}
               address={form.DeliveredToAddress}
-              addressTitle="DELIVERED TO ADDRESS"
+              addressTitle="SHIP TO ADDRESS"
               onName={(value) => updateField('DeliveredToName', value)}
               onAddress={(value) => updateField('DeliveredToAddress', value)}
             />
