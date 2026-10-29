@@ -6,6 +6,7 @@ import {
   listDropboxImageFiles,
 } from './dropbox';
 import { ensurePOConsigneeNameColumn, ensurePODetailImageColumns, ensurePOImportDateColumn } from './poSchema';
+import { ensureBuyingTaxColumns } from './buyingTaxSchema';
 
 const editableLineFields = Object.freeze({
   StyleId: 'StyleId',
@@ -32,6 +33,7 @@ export async function getMasterScreenData(poBarcode = '') {
     ensurePOImportDateColumn(),
     ensurePOConsigneeNameColumn(),
     ensurePODetailImageColumns(),
+    ensureBuyingTaxColumns(),
   ]);
 
   const selectedPO = String(poBarcode || '').trim();
@@ -70,6 +72,9 @@ export async function getMasterScreenData(poBarcode = '') {
          d.Quantity,
          d.ListPriceFOBTransportExcise AS Rate,
          d.LandingPrice,
+         d.BuyingTaxCGST,
+         d.BuyingTaxIGST,
+         d.BuyingTaxSGST,
          d.EstimatedDeliveryDate,
          h.BillTo,
          h.ShipTo,

@@ -22,6 +22,9 @@ const columns = [
   ['Quantity', 'Quantity'],
   ['Rate', 'List price FOB transport excise'],
   ['LandingPrice', 'Landing price'],
+  ['BuyingTaxCGST', 'Buying Tax CGST (%)'],
+  ['BuyingTaxIGST', 'Buying Tax IGST (%)'],
+  ['BuyingTaxSGST', 'Buying Tax SGST (%)'],
   ['EstimatedDeliveryDate', 'Estimated delivery date'],
   ['BillTo', 'Bill to'],
   ['ShipTo', 'Ship to'],
@@ -402,11 +405,14 @@ export default function MasterWorkbench({ data, selectedPO }) {
 }
 
 function numericField(field) {
-  return ['POID', 'MRP', 'Quantity', 'Rate', 'LandingPrice'].includes(field);
+  return ['POID', 'MRP', 'Quantity', 'Rate', 'LandingPrice', 'BuyingTaxCGST', 'BuyingTaxIGST', 'BuyingTaxSGST'].includes(field);
 }
 
 function displayValue(field, value) {
   if (value === null || value === undefined || value === '') return '—';
+  if (['BuyingTaxCGST', 'BuyingTaxIGST', 'BuyingTaxSGST'].includes(field)) {
+    return Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  }
   if (field === 'POImportDate') {
     const raw = String(value).replace('T', ' ');
     const date = raw.slice(0, 10);
