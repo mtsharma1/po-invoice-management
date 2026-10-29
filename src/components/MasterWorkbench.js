@@ -49,6 +49,9 @@ const editorFields = [
   ['Quantity', 'Quantity', 'number'],
   ['Rate', 'List price / rate', 'number'],
   ['LandingPrice', 'Landing price', 'number'],
+  ['BuyingTaxCGST', 'Buying Tax CGST (%)', 'number'],
+  ['BuyingTaxIGST', 'Buying Tax IGST (%)', 'number'],
+  ['BuyingTaxSGST', 'Buying Tax SGST (%)', 'number'],
   ['EstimatedDeliveryDate', 'Estimated delivery date', 'date'],
   ['FactoryDispatchDate', 'Factory dispatch date', 'date'],
 ];

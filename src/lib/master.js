@@ -7,6 +7,7 @@ import {
 } from './dropbox';
 import { ensurePOConsigneeNameColumn, ensurePODetailImageColumns, ensurePOImportDateColumn } from './poSchema';
 import { ensureBuyingTaxColumns } from './buyingTaxSchema';
+import { buyingTaxRates } from './buyingTax';
 
 const editableLineFields = Object.freeze({
   StyleId: 'StyleId',
@@ -22,6 +23,9 @@ const editableLineFields = Object.freeze({
   Quantity: 'Quantity',
   Rate: 'ListPriceFOBTransportExcise',
   LandingPrice: 'LandingPrice',
+  BuyingTaxCGST: 'BuyingTaxCGST',
+  BuyingTaxIGST: 'BuyingTaxIGST',
+  BuyingTaxSGST: 'BuyingTaxSGST',
   EstimatedDeliveryDate: 'EstimatedDeliveryDate',
   FactoryDispatchDate: 'FactoryDispatchDate',
   path_display: 'path_display',
@@ -133,20 +137,25 @@ export async function getMasterScreenData(poBarcode = '') {
 }
 
 export async function saveMasterLine(payload) {
-  await Promise.all([ensurePOConsigneeNameColumn(), ensurePODetailImageColumns()]);
+  await Promise.all([ensurePOConsigneeNameColumn(), ensurePODetailImageColumns(), ensureBuyingTaxColumns()]);
   const poid = Number(payload?.POID || 0);
   if (!Number.isInteger(poid) || poid <= 0) throw new Error('A valid PO line is required.');
 
   return withTransaction(async (run) => {
     const currentRows = await run(
-      'SELECT POBarcode FROM tblPODetails WHERE POID = ? LIMIT 1 FOR UPDATE',
+      'SELECT POBarcode, BuyingTaxCGST, BuyingTaxIGST, BuyingTaxSGST FROM tblPODetails WHERE POID = ? LIMIT 1 FOR UPDATE',
       [poid]
     );
     if (!currentRows.length) throw new Error('The selected PO line no longer exists.');
+    const taxFields = ['BuyingTaxCGST', 'BuyingTaxIGST', 'BuyingTaxSGST'];
+    const taxValues = Object.fromEntries(taxFields.map(field => [field, payload?.[field] ?? currentRows[0][field]]));
+    const taxesChanged = taxFields.some(field => Number(taxValues[field] || 0) !== Number(currentRows[0][field] || 0));
+    if (taxesChanged) buyingTaxRates(taxValues);
 
     const assignments = [];
     const values = [];
     for (const [payloadField, column] of Object.entries(editableLineFields)) {
+      if (taxFields.includes(payloadField) && payload?.[payloadField] === undefined) continue;
       assignments.push(`\`${column}\` = ?`);
       values.push(normalizeMasterValue(payloadField, payload?.[payloadField]));
     }
@@ -554,6 +563,11 @@ async function mapWithConcurrency(values, concurrency, work) {
 }
 
 function normalizeMasterValue(field, value) {
+  if (['BuyingTaxCGST', 'BuyingTaxIGST', 'BuyingTaxSGST'].includes(field)) {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number) || number < 0 || number > 100) throw new Error(`${field} must be between 0 and 100.`);
+    return number;
+  }
   if (field === 'MRP' || field === 'Rate' || field === 'LandingPrice') {
     const number = Number(value || 0);
     if (!Number.isFinite(number) || number < 0) throw new Error(`${field} must be a valid non-negative number.`);
