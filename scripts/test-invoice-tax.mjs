@@ -265,3 +265,33 @@ for (const [label, amount] of [['CGST','90.00'], ['SGST','90.00'], ['IGST','68.0
   assert.equal(totalCell.value.result, Number(amount));
 }
 console.log('Passed invoice HTML and Excel: CGST/SGST/IGST amounts visible; mixed percentages blank.');
+
+const addressHeader = {
+ InvoiceNo: 'ADDRESS/TEST', GSTN: '06BMTPS4959L1ZX', BillFromName: 'TEAKWOOD',
+ ConsigneeName: 'Billing party', ConsigneeAddress: 'GROUND FLOOR, G 3, DARYAGANJ, NEW DELHI, Delhi, 110002 GSTIN/UIN : 07DUNPS3458E1Z6',
+ BuyerGSTIN: '06BMTPS4959L1ZX',
+ DeliveredToName: 'Receiving party', DeliveredToAddress: 'Warehouse 10, Gurgaon, Haryana, 122001 GSTIN: 06BMTPS4959L1ZX'
+};
+const addressDraft = einvoice.createEInvoiceDraft({header: addressHeader, lines: []});
+assert.equal(addressDraft.buyer.Gstin, '07DUNPS3458E1Z6');
+assert.equal(addressDraft.buyer.LglNm, 'Billing party');
+assert.equal(addressDraft.buyer.Stcd, '07');
+assert.equal(addressDraft.buyer.Pin, '110002');
+assert.match(addressDraft.buyer.Addr1, /GROUND FLOOR/);
+assert.doesNotMatch(addressDraft.buyer.Addr1, /GSTIN/);
+assert.equal(addressDraft.shipping.Gstin, '06BMTPS4959L1ZX');
+assert.equal(addressDraft.shipping.Stcd, '06');
+assert.equal(addressDraft.shipping.Pin, '122001');
+assert.match(addressDraft.shipping.Addr1, /Warehouse 10/);
+assert.equal(addressDraft.shipping.enabled, true);
+const addressJson = einvoice.buildDocument({header: addressHeader, lines: []}, addressDraft);
+assert.equal(addressJson.BuyerDtls.Gstin, addressDraft.buyer.Gstin);
+assert.equal(addressJson.ShipDtls.Gstin, addressDraft.shipping.Gstin);
+const missingShip = einvoice.createEInvoiceDraft({header: {...addressHeader, DeliveredToAddress: 'Warehouse 2, Kolkata, West Bengal, 700001'}, lines: []});
+assert.equal(missingShip.shipping.Gstin, '', 'distinct ship-to address must not inherit bill-to GSTIN');
+const sameShip = einvoice.createEInvoiceDraft({header: {...addressHeader, DeliveredToAddress: addressHeader.ConsigneeAddress, DeliveredToName: addressHeader.ConsigneeName}, lines: []});
+assert.equal(sameShip.shipping.Gstin, sameShip.buyer.Gstin);
+const missingData = einvoice.createEInvoiceDraft({header: { ConsigneeAddress: 'Hoogly, West Bengal, 712223', DeliveredToAddress: 'Hoogly, West Bengal, 712223' }, lines: []});
+assert.equal(missingData.buyer.Gstin, '');
+assert.equal(missingData.shipping.Gstin, '');
+console.log('Passed independent Bill To/Ship To GSTINs, names, inline addresses, JSON mapping and missing-data handling.');

@@ -82,19 +82,22 @@ export function createEInvoiceDraft(invoice) {
   });
   const buyer = parsePartyAddress(header.ConsigneeAddress, {
     name: header.ConsigneeName,
-    gstin: validText(header.BuyerGSTIN) ? header.BuyerGSTIN : '',
+    gstin: extractGstin(header.ConsigneeAddress) || (validText(header.BuyerGSTIN) ? header.BuyerGSTIN : ''),
   });
   const dispatch = parsePartyAddress(header.DispatchFromAddress, {
     name: header.DispatchFromName || header.BillFromName,
     fallbackState: seller.Stcd,
   });
+  const sameDeliveryAddress = clean(header.DeliveredToAddress).toUpperCase() === clean(header.ConsigneeAddress).toUpperCase();
   const shipping = parsePartyAddress(header.DeliveredToAddress, {
-    name: header.DeliveredToName,
-    gstin: buyer.Gstin,
-    fallbackState: buyer.Stcd,
+    name: header.DeliveredToName || (sameDeliveryAddress ? buyer.LglNm : ''),
+    gstin: extractGstin(header.DeliveredToAddress) || (sameDeliveryAddress ? buyer.Gstin : ''),
+    fallbackState: sameDeliveryAddress ? buyer.Stcd : '',
   });
   const dispatchEnabled = Boolean(clean(header.DispatchFromAddress)) && !sameAddress(seller, dispatch);
-  const shippingEnabled = Boolean(clean(header.DeliveredToAddress)) && !sameAddress(buyer, shipping);
+  const shippingEnabled = Boolean(clean(header.DeliveredToAddress)) && (
+    !sameAddress(buyer, shipping) || buyer.Gstin !== shipping.Gstin || buyer.LglNm !== shipping.LglNm
+  );
 
   return {
     invoiceNo: clean(header.InvoiceNo),
@@ -143,7 +146,7 @@ export function createEInvoiceDraft(invoice) {
       lineCount: lines.length,
       totalQty: roundQuantity(lines.reduce((sum, line) => sum + number(line.Qty), 0)),
       taxableAmount: roundMoney(lines.reduce((sum, line) => sum + number(line.Amount), 0) + number(header.TransportationCharges)),
-      buyerSource: 'Consignee Address',
+      buyerSource: 'Bill To Address',
     },
   };
 }
@@ -170,7 +173,7 @@ function prepareFromInvoice(invoice, draft) {
       taxValue: roundMoney(document.ValDtls.IgstVal + document.ValDtls.CgstVal + document.ValDtls.SgstVal + document.ValDtls.CesVal + document.ValDtls.StCesVal),
       invoiceValue: document.ValDtls.TotInvVal,
       taxTreatment: document.ValDtls.IgstVal > 0 ? 'IGST' : (document.ValDtls.CgstVal > 0 || document.ValDtls.SgstVal > 0 ? 'CGST + SGST' : 'Without tax payment'),
-      buyerSource: 'Consignee Address',
+      buyerSource: 'Bill To Address',
     },
   };
 }
@@ -256,7 +259,7 @@ function buildDocument(invoice, draft) {
   if (draft.shipping.enabled) {
     const shipping = normalizedParty(draft.shipping);
     document.ShipDtls = {
-      Gstin: shipping.Gstin || buyer.Gstin,
+      Gstin: shipping.Gstin,
       LglNm: shipping.LglNm,
       TrdNm: nullable(shipping.TrdNm),
       Addr1: shipping.Addr1,
@@ -412,8 +415,8 @@ function validateDocument(document, invoice, draft) {
   if (document.EwbDtls) validateEwayBill(document.EwbDtls, add);
 
   if (normalizeIrn(invoice.header.IRN)) warn('Invoice', 'IRN_EXISTS', 'IRN is already generated for this invoice. Confirmation is required before preparing JSON.');
-  if (!clean(invoice.header.ConsigneeAddress)) add('Buyer', 'CONSIGNEE_ADDRESS', 'Consignee Address is blank; BuyerDtls cannot be prepared.');
-  if (draft.sourceSummary?.buyerSource === 'Consignee Address') warn('Buyer', 'BUYER_SOURCE', 'Buyer details were populated from Consignee Address as configured.');
+  if (!clean(invoice.header.ConsigneeAddress)) add('Buyer', 'CONSIGNEE_ADDRESS', 'Bill To Address is blank; BuyerDtls cannot be prepared.');
+  if (draft.sourceSummary?.buyerSource === 'Bill To Address') warn('Buyer', 'BUYER_SOURCE', 'Bill To details were populated from Bill To Address as configured.');
   return { errors, warnings };
 }
 
@@ -494,7 +497,10 @@ function parsePartyAddress(rawValue, defaults = {}) {
   let name = clean(defaults.name);
   if (!name && rawLines.length && !/\d{6}|GST|PHONE|PH\s*NO/i.test(rawLines[0])) name = rawLines.shift();
   const addressLines = rawLines
-    .filter((line) => !/\bGST(?:IN|N)?\b\s*(?:NO)?\s*[:\-]?/i.test(line))
+    .map((line) => line
+      .replace(/\bGST(?:IN|N)?(?:\s*\/\s*UIN)?\s*(?:NO\.?)?\s*[:\-]?\s*\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]\b/ig, '')
+      .replace(/\b\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]\b/ig, '')
+      .replace(/^[\s,;:-]+|[\s,;:-]+$/g, ''))
     .filter((line) => !/\b(?:PH|PHONE|MOBILE)\s*(?:NO)?\s*[:\-]?/i.test(line))
     .map((line) => line.replace(/\bIndia\b[,.]?/ig, '').trim())
     .filter(Boolean);
