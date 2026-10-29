@@ -1,3 +1,5 @@
+import { buyingTaxRates } from './buyingTax';
+import { ensureBuyingTaxColumns } from './buyingTaxSchema';
 import { query, withTransaction } from './db';
 import { getShellOrderContext, listPOBarcodes } from './shellOrders';
 import { getWebSettings } from './settings';
@@ -321,6 +323,7 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
 
   await ensurePOConsigneeNameColumn();
   await ensureInvoiceTaxVersionColumn();
+  await ensureBuyingTaxColumns();
 
   const settings = await getWebSettings();
   const bankDetails = {
@@ -360,6 +363,16 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
       validateDispatchQuantity(row.MinimumQty, Number.MAX_SAFE_INTEGER);
       try { validateDispatchQuantity(row.Requested, row.Available); }
       catch (error) { throw new Error(`PO item ${row.POID}: ${error.message}`); }
+    }
+
+    const taxRows = await run(
+      `SELECT tmp.POID, pd.BuyingTaxCGST, pd.BuyingTaxIGST, pd.BuyingTaxSGST
+       FROM webTmpDispatch tmp JOIN tblPODetails pd ON pd.POID = tmp.POID
+       WHERE tmp.SessionId = ? AND tmp.POBarcode = ? AND tmp.DispatchQty > 0
+         AND COALESCE(tmp.DispatchNo, '') = ''`, [sessionId, poBarcode]);
+    for (const line of taxRows) {
+      try { buyingTaxRates(line); }
+      catch (error) { throw new Error(`PO item ${line.POID}: ${error.message} Correct the PO Buying Tax rates before creating an invoice.`); }
     }
 
     const pendingRows = await run(
@@ -420,7 +433,7 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
           BillFromName, BillFromAddress, DispatchFromName, DispatchFromAddress,
           ConsigneeName, ConsigneeAddress, DeliveredToName, DeliveredToAddress,
           AccountNo, BankName, BranchName, IFSCCode, TaxDetailsVersion)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 2)`,
       [
         poBarcode,
         invoiceNo,

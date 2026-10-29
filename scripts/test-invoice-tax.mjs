@@ -5,7 +5,8 @@ import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const load = (source) => import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
-const taxSource = await readFile('src/lib/invoiceTax.js', 'utf8');
+const buyingSource = await readFile('src/lib/buyingTax.js', 'utf8');
+const taxSource = buyingSource + '\n' + (await readFile('src/lib/invoiceTax.js', 'utf8')).replace(/^import .*;\r?$/gm, '');
 const tax = await load(taxSource);
 const stripImports = (source) => source.replace(/^import .*;\r?$/gm, '');
 const formatSource = await readFile('src/lib/format.js', 'utf8');
@@ -153,6 +154,7 @@ globalThis.__invoiceTaxSaveRun = async (sql, values) => {
   return { insertId: 99, affectedRows: 1 };
 };
 const customer = await load(`
+  const ensureBuyingTaxColumns = async () => {};
   const ensureInvoiceTaxVersionColumn = async () => {};
   const ensureInvoicePresentationColumns = async () => {};
   const ensureInvoiceTransportationColumn = async () => {};
@@ -171,6 +173,95 @@ statements = [];
 await customer.saveCustomerInvoice({ InvoiceNo: 'NEW', TaxDetailsVersion: 0 });
 const insert = statements.find(({ sql }) => sql.startsWith('INSERT'));
 assert.match(insert.sql, /TaxDetailsVersion\)/);
-assert.match(insert.sql, /, 1\)/);
+assert.match(insert.sql, /, 2\)/);
 console.log('Passed: all invoices use current tax details, Excel layout, e-invoice rates and per-line rounding regardless of invoice date or version.');
 
+
+for (const split of [false, true]) {
+  const header = { TaxDetailsVersion: 2, InterStateTax: split ? 0 : 1, IGSTRate: 99, CGST: 99, SGST: 99, TransportationCharges: 100 };
+  const lines = [5, 18].map((rate, index) => ({ VendorArticleName: 'T_SH_PO_' + index, Qty: 1, Rate: 1000, Amount: 1000,
+    BuyingTaxCGST: split ? rate / 2 : 0, BuyingTaxSGST: split ? rate / 2 : 0, BuyingTaxIGST: split ? 0 : rate }));
+  const totals = invoices.calculateInvoiceTotals(header, lines);
+  assert.deepEqual(totals.taxSummary.map(group => group.taxRate), [5, 18]);
+  assert.equal(totals.taxableAmount, 2100);
+  assert.equal(totals.grandTotal, 2348);
+  assert.equal(totals.igstAmount, split ? 0 : 248);
+  assert.equal(totals.cgstAmount, split ? 124 : 0);
+  assert.equal(totals.hideTaxTotals, true);
+  assert.equal(tax.lineTaxRates(header, lines[1]).taxRate, 18, 'PO rates override old T_SH rule and UI switch');
+  const draft = einvoice.createEInvoiceDraft({ header, lines });
+  draft.seller.Stcd = '06'; draft.buyer.Pos = split ? '06' : '07';
+  const document = einvoice.buildDocument({ header, lines }, draft);
+  assert.equal(document.ValDtls.TotInvVal, totals.grandTotal);
+  assert.equal(document.ValDtls.CgstVal, totals.cgstAmount);
+  assert.equal(document.ValDtls.IgstVal, totals.igstAmount);
+  assert.deepEqual(document.ItemList.map(item => item.GstRt), [5, 18, 18]);
+  const workbook = await excel.buildInvoiceWorkbook({header, lines, totals});
+  const ws = workbook.getWorksheet('Invoice');
+  const find = label => { let result; ws.eachRow(row => row.eachCell(cell => { if(cell.value === label && !result) result = cell; })); return result; };
+  const taxCell = find(split ? 'CGST' : 'IGST');
+  // Summary headers occur in A:G; find the totals-box label in H.
+  let rowNumber;
+  ws.eachRow(row => { if (ws.getCell(`H${row.number}`).value === (split ? 'CGST' : 'IGST')) rowNumber = row.number; });
+  assert.equal(ws.getCell(`K${rowNumber}`).value, '');
+  assert.equal(ws.getCell(`L${rowNumber}`).value.result, split ? totals.cgstAmount : totals.igstAmount);
+  const grand = find('GRAND TOTAL');
+  assert.equal(ws.getCell(`L${grand.row}`).value.result, 2348);
+  const summary = find('Tax Rate');
+  assert.equal(ws.getCell(`B${summary.row + 1}`).value.result, 1000);
+  assert.equal(ws.getCell(`B${summary.row + 2}`).value.result, 1100);
+  // Confirm export serializes and reloads without merged-cell or formula corruption.
+  await workbook.xlsx.writeBuffer();
+}
+const oldHeader = { TaxDetailsVersion: 1, InterStateTax: 0, IGSTRate: 18 };
+const oldLine = { VendorArticleName: 'T_SH_OLD', Qty: 1, Rate: 1000, Amount: 1000, BuyingTaxIGST: 18 };
+assert.equal(tax.lineTaxRates(oldHeader, oldLine).taxRate, 5, 'old invoices retain their previous calculation');
+assert.equal(tax.lineTaxRates({TaxDetailsVersion: 2}, oldLine).taxRate, 18);
+assert.throws(() => tax.lineTaxRates({TaxDetailsVersion: 2}, {...oldLine, BuyingTaxIGST: 0}), /Buying Tax/);
+console.log('Passed new PO-rate invoices, mixed GST summaries, 18% freight, Excel blanks/totals, e-invoice reconciliation and legacy preservation.');
+const mixedHeader = { TaxDetailsVersion: 2, TransportationCharges: 100 };
+const mixedLines = [
+ { Qty: 1, Rate: 1000, Amount: 1000, BuyingTaxCGST: 9, BuyingTaxSGST: 9, BuyingTaxIGST: 0 },
+ { Qty: 1, Rate: 1000, Amount: 1000, BuyingTaxCGST: 0, BuyingTaxSGST: 0, BuyingTaxIGST: 5 }
+];
+const mixedTotals = invoices.calculateInvoiceTotals(mixedHeader, mixedLines);
+assert.equal(mixedTotals.hasMixedTaxTypes, true);
+assert.equal(mixedTotals.grandTotal, 2348);
+assert.equal(mixedTotals.cgstAmount, 90);
+assert.equal(mixedTotals.igstAmount, 68);
+const mixedBook = await excel.buildInvoiceWorkbook({header: mixedHeader, lines: mixedLines, totals: mixedTotals});
+let freightOnlyRow;
+mixedBook.getWorksheet('Invoice').eachRow(row => {
+ if (row.getCell(1).value === 18 && row.getCell(2).value?.result === 100) freightOnlyRow = row;
+});
+assert.ok(freightOnlyRow);
+assert.match(freightOnlyRow.getCell(3).value.formula, /^SUM\(0\)\+ROUND/);
+assert.equal(freightOnlyRow.getCell(3).value.result, 18);
+console.log('Passed mixed tax components with equal total rates: Excel freight and item taxes are not double counted.');
+// Render the real invoice component to verify mixed-rate totals remain visible.
+const swc = require('next/dist/build/swc');
+const viewCode = swc.transformSync(await readFile('src/components/InvoiceView.js', 'utf8'), {
+  jsc: { parser: { syntax: 'ecmascript', jsx: true }, target: 'es2020', transform: { react: { runtime: 'automatic' } } },
+  module: { type: 'commonjs' }
+}).code;
+const format = await load(formatSource);
+const viewModule = { exports: {} };
+new Function('require', 'module', 'exports', viewCode)(name => {
+  if (name === '@/lib/format') return format;
+  if (name === '@/lib/invoiceTax') return tax;
+  if (name === '@/lib/invoiceQr') return { invoiceQrUrl: () => '/qr.png' };
+  return require(name);
+}, viewModule, viewModule.exports);
+const React = require('react');
+const html = require('react-dom/server').renderToStaticMarkup(React.createElement(viewModule.exports.default, {
+  invoice: { header: mixedHeader, lines: mixedLines, totals: mixedTotals }
+}));
+for (const [label, amount] of [['CGST','90.00'], ['SGST','90.00'], ['IGST','68.00']]) {
+  assert.ok(html.includes(`<strong>${label}</strong><span></span><span>${amount}</span>`), label + ' total must render with a blank rate and visible amount');
+  let totalCell;
+  mixedBook.getWorksheet('Invoice').eachRow(row => {
+    if (row.getCell(8).value === label) totalCell = row.getCell(12);
+  });
+  assert.equal(totalCell.value.result, Number(amount));
+}
+console.log('Passed invoice HTML and Excel: CGST/SGST/IGST amounts visible; mixed percentages blank.');

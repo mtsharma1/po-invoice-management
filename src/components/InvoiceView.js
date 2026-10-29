@@ -94,7 +94,7 @@ export default function InvoiceView({ invoice }) {
             <caption>Tax summary</caption>
             <thead><tr>{['Tax Rate', 'Taxable Amount', 'IGST', 'CGST', 'SGST', 'Total Tax', 'Total Amount'].map((label) => <th key={label}>{label}</th>)}</tr></thead>
             <tbody>{(totals.taxSummary || []).map((group) => (
-              <tr key={group.taxRate}>
+              <tr key={`${group.igstRate}/${group.cgstRate}/${group.sgstRate}`}>
                 <td>{group.taxRate}%</td>
                 {[group.taxableAmount, group.igstAmount, group.cgstAmount, group.sgstAmount, group.totalTax, group.totalAmount].map((amount, index) => <td key={index}>{money(amount)}</td>)}
               </tr>
@@ -104,7 +104,7 @@ export default function InvoiceView({ invoice }) {
         <div className="totals-box">
           {totals.transportationCharges > 0 ? <div><strong>TRANSPORTATION CHARGES</strong><span /><span>{money(totals.transportationCharges)}</span></div> : null}
           <div><strong>TAXABLE AMOUNT</strong><span /><span>{money(totals.taxableAmount)}</span></div>
-          {totals.isInterState ? (
+          {totals.isInterState || totals.hasMixedTaxTypes ? (
             <>
               <div><strong>CGST</strong><span>{taxRateLabel(totals.cgstRate, showTaxDetails)}</span><span>{money(totals.cgstAmount)}</span></div>
               <div><strong>SGST</strong><span>{taxRateLabel(totals.sgstRate, showTaxDetails)}</span><span>{money(totals.sgstAmount)}</span></div>
@@ -112,6 +112,7 @@ export default function InvoiceView({ invoice }) {
           ) : (
             <div><strong>IGST</strong><span>{taxRateLabel(totals.igstRate, showTaxDetails)}</span><span>{money(totals.igstAmount)}</span></div>
           )}
+          {totals.hasMixedTaxTypes ? <div><strong>IGST</strong><span /><span>{money(totals.igstAmount)}</span></div> : null}
           <div><strong>ROUND OFF</strong><span /><span>{money(totals.roundOff)}</span></div>
           <div className="grand-total"><strong>GRAND TOTAL</strong><span /><strong>{money(totals.grandTotal)}</strong></div>
         </div>

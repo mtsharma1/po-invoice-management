@@ -1,3 +1,4 @@
+import { ensureBuyingTaxColumns } from './buyingTaxSchema';
 import { query, withTransaction } from './db';
 import { getWebSettings } from './settings';
 import { ensureInvoiceTaxVersionColumn } from './invoiceTaxSchema';
@@ -106,6 +107,7 @@ export async function saveCustomerInvoice(payload) {
   if (!invoiceNo) throw new Error('Invoice No is required.');
 
   const invoiceId = Number(payload?.InvoiceID || 0);
+  if (!invoiceId) await ensureBuyingTaxColumns();
   const invoice = applyDefaultBankDetails(payload);
   if (payload?.TransportationCharges !== undefined) {
     invoice.TransportationCharges = normaliseTransportationCharges(payload.TransportationCharges);
@@ -117,9 +119,10 @@ export async function saveCustomerInvoice(payload) {
   return withTransaction(async (run) => {
     let updatedRegisteredCharges = false;
     if (invoiceId) {
-      const existing = await run('SELECT InvoiceNo, IRN, TransportationCharges, AckNo, AckDate FROM tblInvoiceHeader WHERE InvoiceID = ? FOR UPDATE', [invoiceId]);
+      const existing = await run('SELECT InvoiceNo, IRN, TransportationCharges, AckNo, AckDate, SGST, CGST, IGSTRate, InterStateTax FROM tblInvoiceHeader WHERE InvoiceID = ? FOR UPDATE', [invoiceId]);
       if (!existing.length) throw new Error('Invoice not found.');
       const saved = existing[0];
+      for (const field of ['SGST', 'CGST', 'IGSTRate', 'InterStateTax']) invoice[field] = saved[field];
       if (payload?.TransportationCharges === undefined) invoice.TransportationCharges = Number(saved.TransportationCharges || 0);
       if (Number(saved.TransportationCharges || 0) !== invoice.TransportationCharges) {
         invoice.TotalInWords = '';
@@ -157,7 +160,7 @@ export async function saveCustomerInvoice(payload) {
     const placeholders = invoiceFields.map(() => '?').join(', ');
     const result = await run(
       `INSERT INTO tblInvoiceHeader (${invoiceFields.join(', ')}, TaxDetailsVersion)
-       VALUES (${placeholders}, 1)`,
+       VALUES (${placeholders}, 2)`,
       values
     );
     return { invoiceId: result.insertId, invoiceNo, bankDetails: savedBankDetails, message: 'Invoice created successfully.' };
@@ -167,6 +170,7 @@ export async function saveCustomerInvoice(payload) {
 function blankInvoice(settings) {
   return {
     InvoiceID: '',
+    TaxDetailsVersion: 2,
     InvoiceNo: '',
     InvoiceDate: toDateInput(new Date()),
     GSTN: '06BMTPS4959L1ZX',
