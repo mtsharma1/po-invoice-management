@@ -184,9 +184,9 @@ for (const split of [false, true]) {
   const totals = invoices.calculateInvoiceTotals(header, lines);
   assert.deepEqual(totals.taxSummary.map(group => group.taxRate), [5, 18]);
   assert.equal(totals.taxableAmount, 2100);
-  assert.equal(totals.grandTotal, 2348);
-  assert.equal(totals.igstAmount, split ? 0 : 248);
-  assert.equal(totals.cgstAmount, split ? 124 : 0);
+  assert.equal(totals.grandTotal, 2335);
+  assert.equal(totals.igstAmount, split ? 0 : 235);
+  assert.equal(totals.cgstAmount, split ? 117.5 : 0);
   assert.equal(totals.hideTaxTotals, true);
   assert.equal(tax.lineTaxRates(header, lines[1]).taxRate, 18, 'PO rates override old T_SH rule and UI switch');
   const draft = einvoice.createEInvoiceDraft({ header, lines });
@@ -195,7 +195,7 @@ for (const split of [false, true]) {
   assert.equal(document.ValDtls.TotInvVal, totals.grandTotal);
   assert.equal(document.ValDtls.CgstVal, totals.cgstAmount);
   assert.equal(document.ValDtls.IgstVal, totals.igstAmount);
-  assert.deepEqual(document.ItemList.map(item => item.GstRt), [5, 18, 18]);
+  assert.deepEqual(document.ItemList.map(item => item.GstRt), [5, 18, 5]);
   const workbook = await excel.buildInvoiceWorkbook({header, lines, totals});
   const ws = workbook.getWorksheet('Invoice');
   const find = label => { let result; ws.eachRow(row => row.eachCell(cell => { if(cell.value === label && !result) result = cell; })); return result; };
@@ -206,10 +206,10 @@ for (const split of [false, true]) {
   assert.equal(ws.getCell(`K${rowNumber}`).value, '');
   assert.equal(ws.getCell(`L${rowNumber}`).value.result, split ? totals.cgstAmount : totals.igstAmount);
   const grand = find('GRAND TOTAL');
-  assert.equal(ws.getCell(`L${grand.row}`).value.result, 2348);
+  assert.equal(ws.getCell(`L${grand.row}`).value.result, 2335);
   const summary = find('Tax Rate');
-  assert.equal(ws.getCell(`B${summary.row + 1}`).value.result, 1000);
-  assert.equal(ws.getCell(`B${summary.row + 2}`).value.result, 1100);
+  assert.equal(ws.getCell(`B${summary.row + 1}`).value.result, 1100);
+  assert.equal(ws.getCell(`B${summary.row + 2}`).value.result, 1000);
   // Confirm export serializes and reloads without merged-cell or formula corruption.
   await workbook.xlsx.writeBuffer();
 }
@@ -218,7 +218,7 @@ const oldLine = { VendorArticleName: 'T_SH_OLD', Qty: 1, Rate: 1000, Amount: 100
 assert.equal(tax.lineTaxRates(oldHeader, oldLine).taxRate, 5, 'old invoices retain their previous calculation');
 assert.equal(tax.lineTaxRates({TaxDetailsVersion: 2}, oldLine).taxRate, 18);
 assert.throws(() => tax.lineTaxRates({TaxDetailsVersion: 2}, {...oldLine, BuyingTaxIGST: 0}), /Buying Tax/);
-console.log('Passed new PO-rate invoices, mixed GST summaries, 18% freight, Excel blanks/totals, e-invoice reconciliation and legacy preservation.');
+console.log('Passed new PO-rate invoices, mixed GST summaries, adaptive freight GST, Excel blanks/totals, e-invoice reconciliation and legacy preservation.');
 const mixedHeader = { TaxDetailsVersion: 2, TransportationCharges: 100 };
 const mixedLines = [
  { Qty: 1, Rate: 1000, Amount: 1000, BuyingTaxCGST: 9, BuyingTaxSGST: 9, BuyingTaxIGST: 0 },
@@ -226,17 +226,17 @@ const mixedLines = [
 ];
 const mixedTotals = invoices.calculateInvoiceTotals(mixedHeader, mixedLines);
 assert.equal(mixedTotals.hasMixedTaxTypes, true);
-assert.equal(mixedTotals.grandTotal, 2348);
+assert.equal(mixedTotals.grandTotal, 2335);
 assert.equal(mixedTotals.cgstAmount, 90);
-assert.equal(mixedTotals.igstAmount, 68);
+assert.equal(mixedTotals.igstAmount, 55);
 const mixedBook = await excel.buildInvoiceWorkbook({header: mixedHeader, lines: mixedLines, totals: mixedTotals});
 let freightOnlyRow;
 mixedBook.getWorksheet('Invoice').eachRow(row => {
- if (row.getCell(1).value === 18 && row.getCell(2).value?.result === 100) freightOnlyRow = row;
+ if (row.getCell(1).value === 5 && row.getCell(2).value?.result === 1100) freightOnlyRow = row;
 });
 assert.ok(freightOnlyRow);
-assert.match(freightOnlyRow.getCell(3).value.formula, /^SUM\(0\)\+ROUND/);
-assert.equal(freightOnlyRow.getCell(3).value.result, 18);
+assert.match(freightOnlyRow.getCell(3).value.formula, /\+ROUND/);
+assert.equal(freightOnlyRow.getCell(3).value.result, 55);
 console.log('Passed mixed tax components with equal total rates: Excel freight and item taxes are not double counted.');
 // Render the real invoice component to verify mixed-rate totals remain visible.
 const swc = require('next/dist/build/swc');
@@ -256,7 +256,7 @@ const React = require('react');
 const html = require('react-dom/server').renderToStaticMarkup(React.createElement(viewModule.exports.default, {
   invoice: { header: mixedHeader, lines: mixedLines, totals: mixedTotals }
 }));
-for (const [label, amount] of [['CGST','90.00'], ['SGST','90.00'], ['IGST','68.00']]) {
+for (const [label, amount] of [['CGST','90.00'], ['SGST','90.00'], ['IGST','55.00']]) {
   assert.ok(html.includes(`<strong>${label}</strong><span></span><span>${amount}</span>`), label + ' total must render with a blank rate and visible amount');
   let totalCell;
   mixedBook.getWorksheet('Invoice').eachRow(row => {
@@ -265,3 +265,58 @@ for (const [label, amount] of [['CGST','90.00'], ['SGST','90.00'], ['IGST','68.0
   assert.equal(totalCell.value.result, Number(amount));
 }
 console.log('Passed invoice HTML and Excel: CGST/SGST/IGST amounts visible; mixed percentages blank.');
+
+const addressHeader = {
+ InvoiceNo: 'ADDRESS/TEST', GSTN: '06BMTPS4959L1ZX', BillFromName: 'TEAKWOOD',
+ ConsigneeName: 'Billing party', ConsigneeAddress: 'GROUND FLOOR, G 3, DARYAGANJ, NEW DELHI, Delhi, 110002 GSTIN/UIN : 07DUNPS3458E1Z6',
+ BuyerGSTIN: '06BMTPS4959L1ZX',
+ DeliveredToName: 'Receiving party', DeliveredToAddress: 'Warehouse 10, Gurgaon, Haryana, 122001 GSTIN: 06BMTPS4959L1ZX'
+};
+const addressDraft = einvoice.createEInvoiceDraft({header: addressHeader, lines: []});
+assert.equal(addressDraft.buyer.Gstin, '07DUNPS3458E1Z6');
+assert.equal(addressDraft.buyer.LglNm, 'Billing party');
+assert.equal(addressDraft.buyer.Stcd, '07');
+assert.equal(addressDraft.buyer.Pin, '110002');
+assert.match(addressDraft.buyer.Addr1, /GROUND FLOOR/);
+assert.doesNotMatch(addressDraft.buyer.Addr1, /GSTIN/);
+assert.equal(addressDraft.shipping.Gstin, '06BMTPS4959L1ZX');
+assert.equal(addressDraft.shipping.Stcd, '06');
+assert.equal(addressDraft.shipping.Pin, '122001');
+assert.match(addressDraft.shipping.Addr1, /Warehouse 10/);
+assert.equal(addressDraft.shipping.enabled, true);
+const addressJson = einvoice.buildDocument({header: addressHeader, lines: []}, addressDraft);
+assert.equal(addressJson.BuyerDtls.Gstin, addressDraft.buyer.Gstin);
+assert.equal(addressJson.ShipDtls.Gstin, addressDraft.shipping.Gstin);
+const missingShip = einvoice.createEInvoiceDraft({header: {...addressHeader, DeliveredToAddress: 'Warehouse 2, Kolkata, West Bengal, 700001'}, lines: []});
+assert.equal(missingShip.shipping.Gstin, '', 'distinct ship-to address must not inherit bill-to GSTIN');
+const sameShip = einvoice.createEInvoiceDraft({header: {...addressHeader, DeliveredToAddress: addressHeader.ConsigneeAddress, DeliveredToName: addressHeader.ConsigneeName}, lines: []});
+assert.equal(sameShip.shipping.Gstin, sameShip.buyer.Gstin);
+const missingData = einvoice.createEInvoiceDraft({header: { ConsigneeAddress: 'Hoogly, West Bengal, 712223', DeliveredToAddress: 'Hoogly, West Bengal, 712223' }, lines: []});
+assert.equal(missingData.buyer.Gstin, '');
+assert.equal(missingData.shipping.Gstin, '');
+console.log('Passed independent Bill To/Ship To GSTINs, names, inline addresses, JSON mapping and missing-data handling.');
+
+for (const split of [false, true]) for (const [rates, expected] of [
+ [[18],18], [[5],5], [[12],12], [[18,18],18], [[5,18],5], [[12,18],5]
+]) {
+ const header = { TaxDetailsVersion: 2, TransportationCharges: 100 };
+ const lines = rates.map(rate => ({Qty:1, Rate:1000, Amount:1000, BuyingTaxCGST:split ? rate/2:0, BuyingTaxSGST:split ? rate/2:0, BuyingTaxIGST:split ? 0:rate}));
+ const freight = tax.transportationChargeLine(header, lines);
+ const freightRates = tax.lineTaxRates(header, freight);
+ assert.equal(freightRates.taxRate, expected);
+ assert.equal(freightRates.cgstRate, split ? expected/2:0);
+ assert.equal(freightRates.igstRate, split ? 0:expected);
+ const totals = invoices.calculateInvoiceTotals(header, lines);
+ const draft = einvoice.createEInvoiceDraft({header,lines});
+ const document = einvoice.buildDocument({header,lines},draft);
+ assert.equal(document.ItemList.at(-1).GstRt, expected);
+ assert.equal(document.ValDtls.TotInvVal, totals.grandTotal);
+ assert.equal(document.ValDtls.IgstVal, totals.igstAmount);
+ assert.equal(document.ValDtls.CgstVal, totals.cgstAmount);
+}
+const sameTotalRateLines = [
+ { Amount:1000, BuyingTaxCGST:9, BuyingTaxSGST:9, BuyingTaxIGST:0 },
+ { Amount:1000, BuyingTaxCGST:0, BuyingTaxSGST:0, BuyingTaxIGST:18 }
+];
+assert.equal(tax.lineTaxRates({TaxDetailsVersion:2}, tax.transportationChargeLine({TaxDetailsVersion:2,TransportationCharges:100},sameTotalRateLines)).taxRate,18,'count distinct total GST rates, not tax component groups');
+console.log('Passed freight GST: single 5/12/18%, repeated rates, mixed rates default 5%, split tax and e-invoice reconciliation.');
