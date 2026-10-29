@@ -30,8 +30,11 @@ export function roundTaxMoney(value) {
 export function transportationChargeLine(header, lines = []) {
   const amount = roundTaxMoney(header?.TransportationCharges);
   if (!(amount > 0)) return null;
-  const split = usesBuyingTax(header) && lines.length > 0 && lines.every(line => buyingTaxRates(line).igstRate === 0);
-  return { BuyingTaxCGST: split ? 9 : 0, BuyingTaxSGST: split ? 9 : 0, BuyingTaxIGST: split ? 0 : 18, VendorArticleName: 'Transportation Charges', HSNCode: '9965', Qty: 1, Rate: amount, Amount: amount };
+  const itemRates = usesBuyingTax(header) ? lines.map(buyingTaxRates) : [];
+  const distinctRates = [...new Set(itemRates.map(rates => roundTaxMoney(rates.taxRate)))];
+  const rate = distinctRates.length === 1 ? distinctRates[0] : 5;
+  const split = itemRates.length > 0 && itemRates.every(rates => rates.igstRate === 0);
+  return { BuyingTaxCGST: split ? rate / 2 : 0, BuyingTaxSGST: split ? rate / 2 : 0, BuyingTaxIGST: split ? 0 : rate, VendorArticleName: 'Transportation Charges', HSNCode: '9965', Qty: 1, Rate: amount, Amount: amount };
 }
 
 export function invoiceTaxSummary(header, lines) {
