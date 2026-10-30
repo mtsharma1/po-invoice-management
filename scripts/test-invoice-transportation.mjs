@@ -122,6 +122,10 @@ for (const charge of [200, 50, 0]) {
   assert.match(result.message, /updated locally/);
   assert.equal(writes.length, 1, 'only the invoice header may be updated; provider records stay intact');
 }
+writes = [];
+await customer.saveCustomerInvoice({ InvoiceID: 1, InvoiceNo: 'TEST/FREIGHT', IRN: '', TransportationCharges: savedHeader.TransportationCharges });
+update = writes.find(x => x.sql.startsWith('UPDATE'));
+assert.equal(update.args[updateFields.indexOf('IRN')], savedHeader.IRN, 'registered/cancelled IRN history cannot be cleared through the editor');
 savedHeader.IRN = ''; writes = [];
 await customer.saveCustomerInvoice({ InvoiceID: 1, InvoiceNo: 'TEST/FREIGHT', TransportationCharges: 100 });
 assert.ok(writes.some(x => x.sql.startsWith('UPDATE')), 'pending IRN submissions do not block local charge edits');
@@ -133,7 +137,7 @@ const wordsSource = await readFile('src/lib/numberWords.js', 'utf8');
 const words = await load(wordsSource);
 let readHeader = { TransportationCharges: 100, IGSTRate: 18, TotalInWords: 'STALE SAVED WORDS' };
 globalThis.__freightRead = async sql => sql.includes('SELECT h.*') ? [{ ...readHeader }] : lines;
-const reader = await load(`const query = globalThis.__freightRead;\n${formatSource}\n${taxSource}\n${wordsSource}\n${strip(await readFile('src/lib/invoices.js', 'utf8'))}`);
+const reader = await load(`const resolveInvoiceTaxSnapshot = async (header,lines) => ({header,lines}); const query = globalThis.__freightRead;\n${formatSource}\n${taxSource}\n${wordsSource}\n${strip(await readFile('src/lib/invoices.js', 'utf8'))}`);
 let reloaded = await reader.getInvoice('TEST/FREIGHT');
 assert.equal(reloaded.header.TotalInWords, words.amountInWords(6283));
 assert.equal(reloaded.totals.transportationCharges, 100);

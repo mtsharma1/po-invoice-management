@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-const load = async path => import('data:text/javascript;base64,' + Buffer.from(await readFile(path, 'utf8')).toString('base64'));
+const load = async path => import('data:text/javascript;base64,' + Buffer.from((await readFile(path, 'utf8')).replace(/^import .*;\r?$/gm,'') + '\nconst freezeTaxCandidate = async () => {};').toString('base64'));
 const { saveProductionIrnFields } = await load('src/lib/productionIrnSave.js');
 const result = { Irn: 'a'.repeat(64), AckNo: 132628936888967, AckDt: '2026-09-22 15:39:00' };
 for (const initial of [null, '', 'null', ' NULL ', 'undefined', ' ']) {

@@ -6,6 +6,7 @@ export function usesItemTaxDetails() {
 
 // Preserve the application's existing switch: selected means CGST + SGST.
 export function lineTaxRates(header, line) {
+  if (line.FrozenTaxRates) return line.FrozenTaxRates;
   if (usesBuyingTax(header)) return buyingTaxRates(line);
   const split = Number(header?.InterStateTax || 0) !== 0;
   const positive = (value, fallback) => Number(value) > 0 ? Number(value) : fallback;
@@ -30,11 +31,11 @@ export function roundTaxMoney(value) {
 export function transportationChargeLine(header, lines = []) {
   const amount = roundTaxMoney(header?.TransportationCharges);
   if (!(amount > 0)) return null;
-  const itemRates = usesBuyingTax(header) ? lines.map(buyingTaxRates) : [];
+  const itemRates = usesBuyingTax(header) ? lines.map(line => lineTaxRates(header,line)) : [];
   const distinctRates = [...new Set(itemRates.map(rates => roundTaxMoney(rates.taxRate)))];
   const rate = distinctRates.length === 1 ? distinctRates[0] : 5;
   const split = itemRates.length > 0 && itemRates.every(rates => rates.igstRate === 0);
-  return { BuyingTaxCGST: split ? rate / 2 : 0, BuyingTaxSGST: split ? rate / 2 : 0, BuyingTaxIGST: split ? 0 : rate, VendorArticleName: 'Transportation Charges', HSNCode: '9965', Qty: 1, Rate: amount, Amount: amount };
+  return { FrozenTaxRates: header?.FrozenTransportationTaxRates, BuyingTaxCGST: split ? rate / 2 : 0, BuyingTaxSGST: split ? rate / 2 : 0, BuyingTaxIGST: split ? 0 : rate, VendorArticleName: 'Transportation Charges', HSNCode: '9965', Qty: 1, Rate: amount, Amount: amount };
 }
 
 export function invoiceTaxSummary(header, lines) {

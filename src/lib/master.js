@@ -8,6 +8,7 @@ import {
 import { ensurePOConsigneeNameColumn, ensurePODetailImageColumns, ensurePOImportDateColumn } from './poSchema';
 import { ensureBuyingTaxColumns } from './buyingTaxSchema';
 import { buyingTaxRates } from './buyingTax';
+import { ensureInvoiceTaxVersionColumn } from './invoiceTaxSchema';
 
 const editableLineFields = Object.freeze({
   StyleId: 'StyleId',
@@ -140,7 +141,7 @@ export async function getMasterScreenData(poBarcode = '') {
 }
 
 export async function saveMasterLine(payload) {
-  await Promise.all([ensurePOConsigneeNameColumn(), ensurePODetailImageColumns(), ensureBuyingTaxColumns()]);
+  await Promise.all([ensurePOConsigneeNameColumn(), ensurePODetailImageColumns(), ensureBuyingTaxColumns(), ensureInvoiceTaxVersionColumn()]);
   const poid = Number(payload?.POID || 0);
   if (!Number.isInteger(poid) || poid <= 0) throw new Error('A valid PO line is required.');
 
@@ -176,6 +177,15 @@ export async function saveMasterLine(payload) {
       `UPDATE tblPODetails SET ${assignments.join(', ')} WHERE POID = ?`,
       values
     );
+    if (taxesChanged) {
+      // Only invoices linked to this exact PO item can move from legacy to live PO tax.
+      // Registered/cancelled invoices keep their registration and frozen tax history.
+      await run(`UPDATE tblInvoiceHeader h JOIN tblDispatch d ON d.InvoiceNo = h.InvoiceNo
+        SET h.TaxDetailsVersion = 2, h.TotalInWords = ''
+        WHERE d.POID = ? AND d.POBarcode = ? AND h.POBarcode = ?
+          AND (h.IRN IS NULL OR LOWER(TRIM(h.IRN)) IN ('', 'null', 'undefined'))`,
+        [poid,currentRows[0].POBarcode,currentRows[0].POBarcode]);
+    }
 
     await run(
       `UPDATE tblPOHeaders
