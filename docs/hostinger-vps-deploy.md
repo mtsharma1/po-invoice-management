@@ -49,7 +49,7 @@ pm2 save
 Run from the application's existing production directory:
 
 ```bash
-git pull --ff-only && npm ci && npm run build
+git pull --ff-only && npm ci && npm run db:migrate && npm run build
 ```
 
 Only after the build succeeds, restart the application's PM2 process:
@@ -59,6 +59,8 @@ pm2 restart teakwood-web
 ```
 
 If your process uses a different name, find it with `pm2 list` and use that name.
+See [database-migrations.md](database-migrations.md) for the read-only preview,
+migration status, and `npm run db:generate` for a new empty database.
 Keep the existing port and environment configuration.
 
 `git pull` does not install dependencies. The e-way bill PDF feature requires
