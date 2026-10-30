@@ -8,6 +8,8 @@
     "start": "node ./node_modules/next/dist/bin/next start",
     "lint": "node ./node_modules/next/dist/bin/next lint",
     "db:check": "node scripts/check-db.js",
+    "db:migrate": "node scripts/db-migrate.js",
+    "db:generate": "node scripts/db-migrate.js --generate",
     "db:migrate:dropbox-images": "node scripts/migrate-dropbox-images.js",
     "db:sync:dropbox-images": "node scripts/sync-dropbox-images.js"
   },
