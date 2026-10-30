@@ -77,8 +77,11 @@ export async function getMasterScreenData(poBarcode = '') {
          d.ListPriceFOBTransportExcise AS Rate,
          d.LandingPrice,
          d.BuyingTaxCGST,
+         d.BuyingTaxCGSTAmount,
          d.BuyingTaxIGST,
+         d.BuyingTaxIGSTAmount,
          d.BuyingTaxSGST,
+         d.BuyingTaxSGSTAmount,
          d.EstimatedDeliveryDate,
          h.BillTo,
          h.ShipTo,
@@ -143,7 +146,7 @@ export async function saveMasterLine(payload) {
 
   return withTransaction(async (run) => {
     const currentRows = await run(
-      'SELECT POBarcode, BuyingTaxCGST, BuyingTaxIGST, BuyingTaxSGST FROM tblPODetails WHERE POID = ? LIMIT 1 FOR UPDATE',
+      'SELECT POBarcode, ListPriceFOBTransportExcise AS Rate, BuyingTaxCGST, BuyingTaxIGST, BuyingTaxSGST FROM tblPODetails WHERE POID = ? LIMIT 1 FOR UPDATE',
       [poid]
     );
     if (!currentRows.length) throw new Error('The selected PO line no longer exists.');
@@ -158,6 +161,13 @@ export async function saveMasterLine(payload) {
       if (taxFields.includes(payloadField) && payload?.[payloadField] === undefined) continue;
       assignments.push(`\`${column}\` = ?`);
       values.push(normalizeMasterValue(payloadField, payload?.[payloadField]));
+    }
+    const rate = normalizeMasterValue('Rate', payload?.Rate ?? currentRows[0].Rate);
+    if (taxesChanged || rate !== Number(currentRows[0].Rate || 0)) {
+      for (const field of taxFields) {
+        assignments.push(`\`${field}Amount\` = ?`);
+        values.push(Math.round((rate * Number(taxValues[field] || 0) / 100 + Number.EPSILON) * 100) / 100);
+      }
     }
     assignments.push('ModifiedDate = NOW()');
     values.push(poid);
