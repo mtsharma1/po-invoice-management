@@ -122,6 +122,10 @@ export async function saveCustomerInvoice(payload) {
       const existing = await run('SELECT InvoiceNo, IRN, TransportationCharges, AckNo, AckDate, SGST, CGST, IGSTRate, InterStateTax FROM tblInvoiceHeader WHERE InvoiceID = ? FOR UPDATE', [invoiceId]);
       if (!existing.length) throw new Error('Invoice not found.');
       const saved = existing[0];
+      // Registration (including a cancelled IRN) is permanent invoice history.
+      if (hasIrn(saved.IRN)) {
+        invoice.IRN = saved.IRN;
+      }
       for (const field of ['SGST', 'CGST', 'IGSTRate', 'InterStateTax']) invoice[field] = saved[field];
       if (payload?.TransportationCharges === undefined) invoice.TransportationCharges = Number(saved.TransportationCharges || 0);
       if (Number(saved.TransportationCharges || 0) !== invoice.TransportationCharges) {

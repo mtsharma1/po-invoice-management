@@ -1,3 +1,4 @@
+import { freezeTaxCandidate } from './invoiceTaxSnapshot';
 export function normalizeStoredIrn(value) {
   const text = String(value ?? '').trim();
   return ['null', 'undefined'].includes(text.toLowerCase()) ? '' : text.replace(/\s+/g, '').toLowerCase();
@@ -17,6 +18,7 @@ export async function saveProductionIrnFields(run, invoiceNo, result) {
   const header = headers[0];
   const current = normalizeStoredIrn(header.IRN);
   if (current && current !== irn) throw new Error('Invoice already has a different IRN; existing details were preserved.');
+  await freezeTaxCandidate(run,id,invoiceNo,irn);
   // Avoid rewriting manually entered details that already match the provider response.
   if (current !== irn || String(header.AckNo || '') !== String(result.AckNo) || String(header.AckDate || '') !== ackDate) {
     const update = await run('UPDATE tblInvoiceHeader SET IRN = ?, AckNo = ?, AckDate = ? WHERE InvoiceID = ? AND InvoiceNo = ?', [irn, String(result.AckNo), ackDate, id, invoiceNo]);

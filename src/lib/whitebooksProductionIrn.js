@@ -1,4 +1,5 @@
 import { saveProductionIrnFields } from './productionIrnSave';
+import { ensureInvoiceTaxSnapshots, saveTaxCandidate } from './invoiceTaxSnapshot';
 import { createHash } from 'node:crypto';
 import { query, withTransaction } from './db';
 import { getInvoice } from './invoices';
@@ -6,6 +7,7 @@ import { prepareEInvoice } from './eInvoice';
 import { authenticateWhitebooks, generateWhitebooksIrn, getEInvoiceConfig, WhitebooksError } from './whitebooks';
 
 async function ensureTable() {
+  await ensureInvoiceTaxSnapshots();
   await query(`CREATE TABLE IF NOT EXISTS webWhitebooksProductionIrn (
     InvoiceNo VARCHAR(255) NOT NULL PRIMARY KEY, DocumentKey CHAR(64) NOT NULL UNIQUE,
     InvoiceID BIGINT NOT NULL, State VARCHAR(20) NOT NULL,
@@ -23,6 +25,10 @@ async function applyResult(invoiceNo, result) {
 }
 export async function generateProductionIrn(invoiceNo, draft) {
   const existing = await getProductionIrn(invoiceNo);
+  if (['cancelled','canceled'].includes(String(existing?.state || '').toLowerCase())
+    || ['CNL','CANCELLED','CANCELED'].includes(String(existing?.result?.Status || '').toUpperCase())) {
+    throw new WhitebooksError('This invoice has a cancelled IRN. Its registered tax rates remain frozen.');
+  }
   if (existing?.result) {
     await applyResult(invoiceNo, existing.result);
     return { ok: true, state: 'succeeded', result: existing.result };
@@ -39,7 +45,10 @@ export async function generateProductionIrn(invoiceNo, draft) {
   const [, month, year] = document.DocDtls.Dt.split('/').map(Number);
   const key = createHash('sha256').update(JSON.stringify([document.SellerDtls.Gstin, month >= 4 ? year : year - 1, document.DocDtls.Typ, document.DocDtls.No.toUpperCase()])).digest('hex');
   try {
-    await query('INSERT INTO webWhitebooksProductionIrn (InvoiceNo, DocumentKey, InvoiceID, State, RequestJson) VALUES (?, ?, ?, ?, ?)', [invoiceNo, key, invoice.header.InvoiceID, 'pending', JSON.stringify(document)]);
+    await withTransaction(async run => {
+      await run('INSERT INTO webWhitebooksProductionIrn (InvoiceNo, DocumentKey, InvoiceID, State, RequestJson) VALUES (?, ?, ?, ?, ?)', [invoiceNo, key, invoice.header.InvoiceID, 'pending', JSON.stringify(document)]);
+      await saveTaxCandidate(run,invoice,document);
+    });
   } catch (error) {
     if (error.code === 'ER_DUP_ENTRY') throw new WhitebooksError('A production submission already exists. Refresh the invoice.');
     throw error;

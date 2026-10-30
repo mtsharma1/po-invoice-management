@@ -11,6 +11,7 @@ const source = `${await readFile('src/lib/buyingTax.js','utf8')}
 const ensurePOConsigneeNameColumn = async () => {};
 const ensurePODetailImageColumns = async () => {};
 const ensureBuyingTaxColumns = async () => {};
+const ensureInvoiceTaxVersionColumn = async () => {};
 const withTransaction = work => work(globalThis.__masterTaxRun);
 ${strip(await readFile('src/lib/master.js','utf8'))}`;
 const api = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));

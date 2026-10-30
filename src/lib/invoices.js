@@ -3,6 +3,7 @@ import { query } from './db';
 import { asNumber } from './format';
 import { amountInWords } from './numberWords';
 import { invoiceTaxSummary, lineTaxRates, usesItemTaxDetails } from './invoiceTax';
+import { resolveInvoiceTaxSnapshot } from './invoiceTaxSnapshot';
 
 const preferredHeaderSql = `
   SELECT h.*
@@ -65,13 +66,13 @@ export async function listInvoices(limit = 100) {
 
 export async function getInvoice(invoiceNo) {
   const headers = await query(preferredHeaderSql, [invoiceNo]);
-  const header = headers[0] || null;
+  let header = headers[0] || null;
 
   if (!header) {
     return { header: null, lines: [], totals: emptyTotals() };
   }
 
-  const lines = await query(
+  let lines = await query(
     `SELECT
        ROW_NUMBER() OVER (ORDER BY pd.POID) AS SlNo,
        pd.POID,
@@ -112,6 +113,7 @@ export async function getInvoice(invoiceNo) {
     [invoiceNo]
   );
 
+  ({header,lines} = await resolveInvoiceTaxSnapshot(header,lines));
   const totals = calculateInvoiceTotals(header, lines);
   const storedTotalInWords = String(header.TotalInWords || '').trim();
   return {
