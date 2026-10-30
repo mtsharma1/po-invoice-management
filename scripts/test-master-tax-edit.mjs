@@ -16,11 +16,12 @@ ${strip(await readFile('src/lib/master.js','utf8'))}`;
 const api = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 for(const rates of [[9,0,9],[0,18,0]]) {
  statements=[];
- await api.saveMasterLine({POID:1,SKUCode:'SKU',BuyingTaxCGST:rates[0],BuyingTaxIGST:rates[1],BuyingTaxSGST:rates[2]});
+ await api.saveMasterLine({POID:1,SKUCode:'SKU',Rate:1102,BuyingTaxCGST:rates[0],BuyingTaxIGST:rates[1],BuyingTaxSGST:rates[2]});
  const update=statements.find(s=>s.sql.startsWith('UPDATE tblPODetails'));
  for(const [i,field] of ['BuyingTaxCGST','BuyingTaxIGST','BuyingTaxSGST'].entries()) {
   const columns=[...update.sql.matchAll(/`([^`]+)` = \?/g)].map(match=>match[1]);
   assert.equal(update.values[columns.indexOf(field)], rates[i]);
+  assert.equal(update.values[columns.indexOf(`${field}Amount`)], Math.round(1102*rates[i])/100);
  }
 }
 for(const rates of [[9,18,9],[9,0,0],[0,0,9],[-1,0,9],['bad',0,9]]) {

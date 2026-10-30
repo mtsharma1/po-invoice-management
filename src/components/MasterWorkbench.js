@@ -23,8 +23,11 @@ const columns = [
   ['Rate', 'List price FOB transport excise'],
   ['LandingPrice', 'Landing price'],
   ['BuyingTaxCGST', 'Buying Tax CGST (%)'],
-  ['BuyingTaxIGST', 'Buying Tax IGST (%)'],
+  ['BuyingTaxCGSTAmount', 'Buying Tax CGST Amount'],
   ['BuyingTaxSGST', 'Buying Tax SGST (%)'],
+  ['BuyingTaxSGSTAmount', 'Buying Tax SGST Amount'],
+  ['BuyingTaxIGST', 'Buying Tax IGST (%)'],
+  ['BuyingTaxIGSTAmount', 'Buying Tax IGST Amount'],
   ['EstimatedDeliveryDate', 'Estimated delivery date'],
   ['BillTo', 'Bill to'],
   ['ShipTo', 'Ship to'],
@@ -50,8 +53,8 @@ const editorFields = [
   ['Rate', 'List price / rate', 'number'],
   ['LandingPrice', 'Landing price', 'number'],
   ['BuyingTaxCGST', 'Buying Tax CGST (%)', 'number'],
-  ['BuyingTaxIGST', 'Buying Tax IGST (%)', 'number'],
   ['BuyingTaxSGST', 'Buying Tax SGST (%)', 'number'],
+  ['BuyingTaxIGST', 'Buying Tax IGST (%)', 'number'],
   ['EstimatedDeliveryDate', 'Estimated delivery date', 'date'],
   ['FactoryDispatchDate', 'Factory dispatch date', 'date'],
 ];
@@ -408,7 +411,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
 }
 
 function numericField(field) {
-  return ['POID', 'MRP', 'Quantity', 'Rate', 'LandingPrice', 'BuyingTaxCGST', 'BuyingTaxIGST', 'BuyingTaxSGST'].includes(field);
+  return ['POID', 'MRP', 'Quantity', 'Rate', 'LandingPrice', 'BuyingTaxCGST', 'BuyingTaxIGST', 'BuyingTaxSGST', 'BuyingTaxCGSTAmount', 'BuyingTaxIGSTAmount', 'BuyingTaxSGSTAmount'].includes(field);
 }
 
 function displayValue(field, value) {
@@ -433,7 +436,7 @@ function displayValue(field, value) {
     const [year, month, day] = raw.split('-');
     return year && month && day ? `${day}-${month}-${year}` : String(value);
   }
-  if (['MRP', 'Rate', 'LandingPrice'].includes(field)) {
+  if (['MRP', 'Rate', 'LandingPrice', 'BuyingTaxCGSTAmount', 'BuyingTaxIGSTAmount', 'BuyingTaxSGSTAmount'].includes(field)) {
     return Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   if (field === 'Quantity' || field === 'POID') return Number(value).toLocaleString('en-IN');

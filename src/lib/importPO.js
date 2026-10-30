@@ -42,7 +42,9 @@ const detailColumns = [
   'TaxBCD',
   'TaxBCDAmount',
   'BuyingTaxCGST',
+  'BuyingTaxCGSTAmount',
   'BuyingTaxSGST',
+  'BuyingTaxSGSTAmount',
   'BuyingTaxIGST',
   'BuyingTaxIGSTAmount',
   'TaxSWT',
@@ -71,7 +73,6 @@ const ignoredWorkbookColumns = new Set([
   'FOBAmount',
   'TaxBCD',
   'TaxBCDAmount',
-  'BuyingTaxIGSTAmount',
   'TaxSWT',
   'TaxSWTAmount',
   'SellingTax',
@@ -83,7 +84,6 @@ const ignoredNumericWorkbookColumns = new Set([
   'FOBAmount',
   'TaxBCD',
   'TaxBCDAmount',
-  'BuyingTaxIGSTAmount',
   'TaxSWT',
   'TaxSWTAmount',
   'SellingTax',
@@ -114,7 +114,9 @@ const detailMap = {
   TaxBCD: ['Tax BCD'],
   TaxBCDAmount: ['Tax BCD Amount'],
   BuyingTaxCGST: ['Buying Tax CGST'],
+  BuyingTaxCGSTAmount: ['Buying Tax CGST Amount'],
   BuyingTaxSGST: ['Buying Tax SGST'],
+  BuyingTaxSGSTAmount: ['Buying Tax SGST Amount'],
   BuyingTaxIGST: ['Buying Tax IGST'],
   BuyingTaxIGSTAmount: ['Buying Tax IGST Amount'],
   TaxSWT: ['Tax SWT'],
@@ -638,7 +640,7 @@ function readDetailRows(worksheet, headerRow, columnMap, poBarcode) {
       }
     }
 
-    for (const column of requiredWorkbookDetailColumns.filter(numericColumn)) {
+    for (const column of [...requiredWorkbookDetailColumns.filter(numericColumn), 'BuyingTaxCGSTAmount', 'BuyingTaxIGSTAmount', 'BuyingTaxSGSTAmount']) {
       const rawValue = getMappedCell(worksheet, row, columnMap, column);
       if (rawValue !== null && rawValue !== undefined && String(rawValue).trim() !== '' && !isNumericValue(rawValue)) {
         issues.push(importIssue({
@@ -652,6 +654,9 @@ function readDetailRows(worksheet, headerRow, columnMap, poBarcode) {
 
     try { buyingTaxRates(detail); }
     catch (error) { issues.push(importIssue({ worksheet: worksheet.name, row, field: 'Buying Tax CGST / IGST / SGST', reason: error.message })); }
+    for (const column of ['BuyingTaxCGSTAmount', 'BuyingTaxIGSTAmount', 'BuyingTaxSGSTAmount']) {
+      if (Number(detail[column]) < 0) issues.push(importIssue({ worksheet: worksheet.name, row, field: displayColumnName(column), reason: 'Buying Tax amount cannot be negative.' }));
+    }
 
     const rawDeliveryDate = getMappedCell(worksheet, row, columnMap, 'EstimatedDeliveryDate');
     if (rawDeliveryDate && !toSqlDate(rawDeliveryDate)) {
@@ -733,7 +738,9 @@ function numericColumn(column) {
     'TaxBCD',
     'TaxBCDAmount',
     'BuyingTaxCGST',
+    'BuyingTaxCGSTAmount',
     'BuyingTaxSGST',
+    'BuyingTaxSGSTAmount',
     'BuyingTaxIGST',
     'BuyingTaxIGSTAmount',
     'TaxSWT',
