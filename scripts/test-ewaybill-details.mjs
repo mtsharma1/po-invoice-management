@@ -26,6 +26,7 @@ try {
     assert.equal(url.searchParams.get('ewbNo'), base.number);
     assert.equal(url.searchParams.has('password'), false);
     assert.equal(options.headers['auth-token'], undefined);
+    assert.equal(options.headers.user_name, 'mock-USERNAME');
     return Response.json({ status_cd: '1', data: details });
   };
   const fetched = await api.getWhitebooksEwayBillDetails(base.number, 'sandbox');
