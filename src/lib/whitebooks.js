@@ -52,7 +52,7 @@ export async function getWhitebooksEwayBillDetails(ewbNo, environment = getEwayB
     if (!authResponse.ok) throw new Error('Authentication failed');
     const auth = await authResponse.json();
     if (!['1', 'success', 'sucess'].includes(String(auth?.status_cd ?? auth?.status).toLowerCase())) throw new Error('Authentication failed');
-    const response = await fetch(url, { method: 'GET', headers: Object.fromEntries(keys.map(key => [key, values[key]])), cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000) });
+    const response = await fetch(url, { method: 'GET', headers: { ...headers, user_name: values.username.trim() }, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000) });
     if (!response.ok) throw new Error('Lookup failed');
     payload = await response.json();
   } catch { throw new WhitebooksError('Unable to retrieve full e-way bill details from WhiteBooks. Check the e-way bill API credentials and retry. No bill was changed.'); }
