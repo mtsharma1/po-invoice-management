@@ -24,7 +24,7 @@ export default function InvoiceView({ invoice }) {
         </div>
       </div>
 
-      <div className="invoice-title boxed heavy">TAX INVOICE</div>
+      <div className="invoice-title boxed heavy">{header.CancelledAt ? 'CANCELLED TAX INVOICE' : 'TAX INVOICE'}</div>
       <div className="invoice-meta boxed heavy">
         <strong>INVOICE NO: {text(header.InvoiceNo)}</strong>
         <strong>DATE- {dateText(header.InvoiceDate)}</strong>

@@ -1,3 +1,4 @@
+import { ensureInvoiceCancellationSchema } from './invoiceCancellationSchema';
 import { usesBuyingTax } from './buyingTax';
 import { query } from './db';
 import { asNumber } from './format';
@@ -23,9 +24,11 @@ const preferredHeaderSql = `
 `;
 
 export async function listInvoices(limit = 100) {
+  await ensureInvoiceCancellationSchema();
   return query(
     `SELECT
        h.InvoiceID,
+       h.CancelledAt,
        h.InvoiceNo,
        h.InvoiceDate,
        h.IRN,
@@ -35,10 +38,11 @@ export async function listInvoices(limit = 100) {
        h.OrderDate,
        h.ConsigneeName,
        h.DeliveredToName,
-       COALESCE(a.lineCount, 0) AS lineCount,
-       COALESCE(a.totalQty, 0) AS totalQty,
-       COALESCE(a.taxableAmount, 0) AS taxableAmount
+       COALESCE(JSON_LENGTH(c.SnapshotJson, '$.lines'), a.lineCount, 0) AS lineCount,
+       COALESCE(JSON_EXTRACT(c.SnapshotJson, '$.totals.totalQty') + 0, a.totalQty, 0) AS totalQty,
+       COALESCE(JSON_EXTRACT(c.SnapshotJson, '$.totals.taxableAmount') + 0, a.taxableAmount, 0) AS taxableAmount
      FROM tblInvoiceHeader h
+     LEFT JOIN webInvoiceCancellations c ON c.InvoiceID = h.InvoiceID
      JOIN (
        SELECT
          InvoiceNo,
@@ -64,15 +68,22 @@ export async function listInvoices(limit = 100) {
   );
 }
 
-export async function getInvoice(invoiceNo) {
-  const headers = await query(preferredHeaderSql, [invoiceNo]);
+export async function getInvoice(invoiceNo, run = query) {
+  await ensureInvoiceCancellationSchema();
+  const headers = await run(preferredHeaderSql, [invoiceNo]);
   let header = headers[0] || null;
 
   if (!header) {
     return { header: null, lines: [], totals: emptyTotals() };
   }
 
-  let lines = await query(
+  if (header.CancelledAt) {
+    const [archive] = await run('SELECT SnapshotJson FROM webInvoiceCancellations WHERE InvoiceID = ?', [header.InvoiceID]);
+    if (!archive) throw new Error('Cancelled invoice archive is missing.');
+    const snapshot = JSON.parse(archive.SnapshotJson);
+    return { ...snapshot, header: { ...snapshot.header, CancelledAt: header.CancelledAt } };
+  }
+  let lines = await run(
     `SELECT
        ROW_NUMBER() OVER (ORDER BY pd.POID) AS SlNo,
        pd.POID,

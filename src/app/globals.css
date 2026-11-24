@@ -7308,3 +7308,12 @@ table thead th,
   .customer-invoice-edit-preview > h2 { display: none; }
   .customer-invoice-edit-page .customer-invoice-edit-preview { border: 0; padding: 0; overflow: visible; }
 }
+
+/* Invoice cancellation: keep the existing workspace layout. */
+.invoice-edit-fields { min-width: 0; padding: 0; margin: 0; border: 0; }
+.customer-invoice-access .customer-invoice-records th:last-child,
+.customer-invoice-access .customer-invoice-records td:last-child { width: 120px; min-width: 120px; }
+.customer-invoice-access .invoice-cancel-button { white-space: nowrap; border: 1px solid #e8b9b9; border-radius: 6px; padding: 7px 10px; background: #fff6f6; color: #a52d35; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.customer-invoice-access .invoice-cancel-button:hover { background: #ffe8e8; }
+.customer-invoice-access .invoice-cancel-button:disabled { opacity: .55; cursor: default; }
+.customer-invoice-access .invoice-cancelled-label { color: #a52d35; font-size: 12px; font-weight: 600; }

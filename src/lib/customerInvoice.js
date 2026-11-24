@@ -1,3 +1,4 @@
+import { ensureInvoiceCancellationSchema } from './invoiceCancellationSchema';
 import { ensureBuyingTaxColumns } from './buyingTaxSchema';
 import { query, withTransaction } from './db';
 import { getWebSettings } from './settings';
@@ -50,6 +51,7 @@ const invoiceFields = [
 ];
 
 export async function listCustomerInvoices({ search = '', limit = 100 } = {}) {
+  await ensureInvoiceCancellationSchema();
   const like = `%${search}%`;
   const where = search
     ? `WHERE h.InvoiceNo LIKE ?
@@ -63,6 +65,7 @@ export async function listCustomerInvoices({ search = '', limit = 100 } = {}) {
   const rows = await query(
     `SELECT
        h.InvoiceID,
+       h.CancelledAt,
        h.InvoiceNo,
        h.InvoiceDate,
        h.IRN,
@@ -91,6 +94,7 @@ export async function getCustomerInvoiceScreenData({ invoiceNo = '', search = ''
 }
 
 export async function getInvoiceHeaderForForm(invoiceNo = '') {
+  await ensureInvoiceCancellationSchema();
   const settings = await getWebSettings();
   if (!invoiceNo) return blankInvoice(settings);
 
@@ -106,6 +110,7 @@ export async function getInvoiceHeaderForForm(invoiceNo = '') {
 }
 
 export async function saveCustomerInvoice(payload) {
+  await ensureInvoiceCancellationSchema();
   const invoiceNo = String(payload?.InvoiceNo || '').trim();
   if (!invoiceNo) throw new Error('Invoice No is required.');
 
@@ -122,9 +127,10 @@ export async function saveCustomerInvoice(payload) {
   return withTransaction(async (run) => {
     let updatedRegisteredCharges = false;
     if (invoiceId) {
-      const existing = await run('SELECT InvoiceNo, IRN, TransportationCharges, AckNo, AckDate, SGST, CGST, IGSTRate, InterStateTax FROM tblInvoiceHeader WHERE InvoiceID = ? FOR UPDATE', [invoiceId]);
+      const existing = await run('SELECT InvoiceNo, IRN, TransportationCharges, AckNo, AckDate, SGST, CGST, IGSTRate, InterStateTax, CancelledAt FROM tblInvoiceHeader WHERE InvoiceID = ? FOR UPDATE', [invoiceId]);
       if (!existing.length) throw new Error('Invoice not found.');
       const saved = existing[0];
+      if (saved.CancelledAt) throw new Error('Cancelled invoices cannot be edited.');
       // Registration (including a cancelled IRN) is permanent invoice history.
       if (hasIrn(saved.IRN)) {
         invoice.IRN = saved.IRN;

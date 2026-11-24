@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const load = source => import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const load = source => import('data:text/javascript;base64,' + Buffer.from('const ensureInvoiceCancellationSchema = async () => {};\n' + source).toString('base64'));
 const strip = source => source.replace(/^import .*;\r?$/gm, '');
 const buyingSource = await readFile('src/lib/buyingTax.js', 'utf8');
 const taxSource = buyingSource + '\n' + (await readFile('src/lib/invoiceTax.js', 'utf8')).replace(/^import .*;\r?$/gm, '');

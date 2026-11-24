@@ -81,6 +81,7 @@ globalThis.__freezeQuery=async(sql,args=[])=>{
  else throw new Error('Unexpected test query: '+sql);
  return {affectedRows:1,insertId:1};
 };
+urls.set('invoiceCancellationSchema',url('export const ensureInvoiceCancellationSchema=async()=>{};'));
 urls.set('db',url('export const query=(...args)=>globalThis.__freezeQuery(...args);export const withTransaction=work=>work(query);'));
 urls.set('whitebooks',url(`export class WhitebooksError extends Error{};export const getEInvoiceConfig=()=>({values:{gstin:'${gstin}'}});export const authenticateWhitebooks=async()=>({authToken:'mock'});export const generateWhitebooksIrn=async()=>({Irn:'${irn}',AckNo:'123456',AckDt:'2026-10-28 12:00:00'});`));
 urls.set('ewayBillTransport',url('export const getEwayBillTransport=async()=>null;'));

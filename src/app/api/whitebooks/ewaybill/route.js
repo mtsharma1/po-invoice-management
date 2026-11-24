@@ -1,3 +1,4 @@
+import { getInvoice } from '@/lib/invoices';
 import { isSameOriginRequest } from '@/lib/requestOrigin';
 import { saveEwayBillTransport } from '@/lib/ewayBillTransport';
 import { getCurrentSession } from '@/lib/auth';
@@ -22,6 +23,7 @@ async function handle(request, generate) {
     catch { return json({ ok: false, error: 'Invalid JSON request.' }, 400); }
     const invoiceNo = typeof payload?.invoiceNo === 'string' ? payload.invoiceNo.trim() : '';
     if (!invoiceNo || invoiceNo.length > 255) return json({ ok: false, error: 'A valid invoice number is required.' }, 400);
+    if (generate && (await getInvoice(invoiceNo)).header?.CancelledAt) return json({ ok: false, error: 'Cancelled invoices cannot be edited or submitted.' }, 409);
     if (request.method === 'POST' && ['reconcile', 'save-existing'].includes(payload.action)) {
       const environment = getEwayBillEnvironment();
       const confirmed = payload.action === 'save-existing' ? payload.confirmedEwbNo : null;

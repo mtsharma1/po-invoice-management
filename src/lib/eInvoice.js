@@ -158,6 +158,7 @@ export function createEInvoiceDraft(invoice) {
 function prepareFromInvoice(invoice, draft) {
   const document = buildDocument(invoice, draft);
   const { errors, warnings } = validateDocument(document, invoice, draft);
+  if (invoice.header?.CancelledAt) errors.push(error('Invoice', 'CANCELLED', 'Cancelled invoices cannot be submitted.'));
   const jsonText = JSON.stringify([document], null, 2);
   if (Buffer.byteLength(jsonText, 'utf8') > 2 * 1024 * 1024) {
     errors.push(error('Invoice', 'JSON_SIZE', 'Prepared JSON exceeds the 2 MB bulk-upload limit.'));

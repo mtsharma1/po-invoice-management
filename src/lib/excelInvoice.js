@@ -130,7 +130,7 @@ async function writeTopBlock(ws, header) {
     ws.getCell('J1').value = '';
   }
 
-  mergeValue(ws, 'A5:L5', 'TAX INVOICE', 'center', true, 12);
+  mergeValue(ws, 'A5:L5', header.CancelledAt ? 'CANCELLED TAX INVOICE' : 'TAX INVOICE', 'center', true, 12);
   mergeValue(ws, 'A6:E6', `INVOICE NO: ${text(header.InvoiceNo)}`, 'center', true, 10);
   mergeValue(ws, 'F6:L6', `DATE-  ${dateText(header.InvoiceDate)}`, 'center', true, 10);
   box(ws, 'A5:L6', borderMedium);

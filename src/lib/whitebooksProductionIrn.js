@@ -25,6 +25,8 @@ async function applyResult(invoiceNo, result) {
   await withTransaction(run => saveProductionIrnFields(run, invoiceNo, result));
 }
 export async function generateProductionIrn(invoiceNo, draft) {
+  const currentInvoice = await getInvoice(invoiceNo);
+  if (currentInvoice.header?.CancelledAt) throw new WhitebooksError('Cancelled invoices cannot generate IRNs.');
   const existing = await getProductionIrn(invoiceNo);
   if (['cancelled','canceled'].includes(String(existing?.state || '').toLowerCase())
     || ['CNL','CANCELLED','CANCELED'].includes(String(existing?.result?.Status || '').toUpperCase())) {

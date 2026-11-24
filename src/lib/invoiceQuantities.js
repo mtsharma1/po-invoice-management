@@ -1,3 +1,4 @@
+import { ensureInvoiceCancellationSchema } from './invoiceCancellationSchema';
 import { buyingTaxRates, usesBuyingTax } from './buyingTax';
 import { query, withTransaction } from './db';
 import { validateDispatchQuantity } from './dispatchQuantity';
@@ -11,8 +12,9 @@ export class InvoiceQuantityError extends Error {
 }
 
 export async function quantityInvoiceHeader(run, invoiceNo, lock = false) {
+  await ensureInvoiceCancellationSchema();
   const [header] = await run(
-    `SELECT InvoiceID, InvoiceNo, POBarcode, IRN, TaxDetailsVersion, InterStateTax, CGST, SGST, IGSTRate
+    `SELECT InvoiceID, InvoiceNo, POBarcode, IRN, TaxDetailsVersion, InterStateTax, CGST, SGST, IGSTRate, CancelledAt
      FROM tblInvoiceHeader WHERE InvoiceNo = ?
      ORDER BY (InvoiceDate IS NOT NULL) DESC, InvoiceID DESC LIMIT 1 ${lock ? 'FOR UPDATE' : ''}`,
     [invoiceNo]
@@ -35,7 +37,7 @@ async function readIrnRecords(run, sql, value) {
 }
 
 export async function markEditableInvoiceRows(rows) {
-  const candidates = rows.filter(row => row.InvoiceNo && row.POBarcode && !storedIrn(row.IRN));
+  const candidates = rows.filter(row => !row.CancelledAt && row.InvoiceNo && row.POBarcode && !storedIrn(row.IRN));
   if (!candidates.length) return rows.map(({ IRN, ...row }) => ({ ...row, CanEditQuantities: false }));
   const invoiceNos = [...new Set(candidates.map(row => row.InvoiceNo))];
   const [production, sandbox, snapshots] = await Promise.all([
@@ -50,6 +52,7 @@ export async function markEditableInvoiceRows(rows) {
 }
 
 async function assertEditable(run, header) {
+  if (header.CancelledAt) throw new InvoiceQuantityError('Cancelled invoices cannot be edited.', 409);
   if (storedIrn(header.IRN)
     || await hasIrnRecord(run, 'SELECT 1 FROM webWhitebooksProductionIrn WHERE InvoiceNo = ?', header.InvoiceNo)
     || await hasIrnRecord(run, 'SELECT 1 FROM webWhitebooksSandboxIrn WHERE InvoiceNo = ?', header.InvoiceNo)
@@ -84,7 +87,7 @@ function groupDispatch(rows) {
 // The IRN reservation holds the same invoice header lock as the editor.
 export async function assertCurrentIrnQuantities(run, header, invoice) {
   const groups = groupDispatch(await getDispatchRows(run, header.InvoiceNo));
-  if (storedIrn(header.IRN) || Number(header.InvoiceID) !== Number(invoice.header.InvoiceID)
+  if (header.CancelledAt || storedIrn(header.IRN) || Number(header.InvoiceID) !== Number(invoice.header.InvoiceID)
     || invoice.lines.length !== groups.size
     || invoice.lines.some(line => Number(line.Qty) !== groups.get(line.POID)?.quantity)) {
     throw new InvoiceQuantityError('Invoice quantities or IRN status changed. Refresh the invoice before submitting.', 409);
