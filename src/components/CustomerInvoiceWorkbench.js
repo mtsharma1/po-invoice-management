@@ -269,12 +269,13 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
             <button className="filter-clear-btn" type="button" onClick={clearListSearch} title="Clear invoice list search"><ActionIcon name="reset" /> Clear</button>
           </div>
           <div className="invoice-list-scroll">
-            <table className="mini-list-table">
+            <table className="mini-list-table customer-invoice-records">
               <thead>
                 <tr>
                   <th>INVOICE ID</th>
                   <th>INVOICE NO</th>
                   <th>INVOICE DATE</th>
+                  <th scope="col">ACTION</th>
                 </tr>
               </thead>
               <tbody>
@@ -287,10 +288,22 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
                     <td className="num">{row.InvoiceID}</td>
                     <td>{row.InvoiceNo}</td>
                     <td>{dateText(row.InvoiceDate)}</td>
+                    <td>
+                      {row.CanEditQuantities ? (
+                        <Link
+                          className="customer-invoice-edit-link"
+                          href={`/customer-invoice/${encodeURIComponent(row.InvoiceNo)}/edit`}
+                          aria-label={`Edit invoice ${row.InvoiceNo}`}
+                          onClick={event => event.stopPropagation()}
+                        >
+                          <ActionIcon name="edit" /> Edit
+                        </Link>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
                 {!rows.length ? (
-                  <tr><td colSpan="3">No invoice found.</td></tr>
+                  <tr><td colSpan="4">No invoice found.</td></tr>
                 ) : null}
               </tbody>
             </table>

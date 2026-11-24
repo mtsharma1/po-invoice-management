@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
-import { query } from './db';
-import { prepareEInvoice } from './eInvoice';
+import { query, withTransaction } from './db';
+import { prepareEInvoiceFromInvoice } from './eInvoice';
+import { getInvoice } from './invoices';
+import { assertCurrentIrnQuantities, InvoiceQuantityError, quantityInvoiceHeader } from './invoiceQuantities';
 import { authenticateWhitebooks, generateWhitebooksIrn, WhitebooksError } from './whitebooks';
 
 async function ensureTable() {
@@ -23,7 +25,8 @@ export async function getSandboxIrn(invoiceNo) {
 }
 
 export async function generateSandboxIrn(invoiceNo, draft) {
-  const prepared = await prepareEInvoice(invoiceNo, draft);
+  const invoice = await getInvoice(invoiceNo);
+  const prepared = prepareEInvoiceFromInvoice(invoice, draft);
   if (!prepared.valid) return { ok: false, error: 'Correct invoice validation errors before generating IRN.', validation: prepared };
   if (prepared.hasIrn) throw new WhitebooksError('This invoice already has a production IRN.');
   const document = prepared.document;
@@ -42,9 +45,14 @@ export async function generateSandboxIrn(invoiceNo, draft) {
   ])).digest('hex');
   try {
     // A durable unique reservation prevents simultaneous requests across server workers.
-    await query('INSERT INTO webWhitebooksSandboxIrn (InvoiceNo, DocumentKey, State, RequestJson) VALUES (?, ?, ?, ?)',
-      [invoiceNo, documentKey, 'pending', JSON.stringify(document)]);
+    await withTransaction(async run => {
+      const header = await quantityInvoiceHeader(run, invoiceNo, true);
+      await assertCurrentIrnQuantities(run, header, invoice);
+      await run('INSERT INTO webWhitebooksSandboxIrn (InvoiceNo, DocumentKey, State, RequestJson) VALUES (?, ?, ?, ?)',
+        [invoiceNo, documentKey, 'pending', JSON.stringify(document)]);
+    });
   } catch (error) {
+    if (error instanceof InvoiceQuantityError) throw new WhitebooksError(error.message);
     if (error.code === 'ER_DUP_ENTRY') throw new WhitebooksError('This invoice or document already has a submission. Refresh to see its status.');
     throw error;
   }

@@ -7,6 +7,11 @@ const url=source=>'data:text/javascript;base64,'+Buffer.from(source).toString('b
 const urls=new Map();
 const strip=source=>source.replace(/^import[\s\S]*?from\s+['"][^'"]+['"];?\r?$/gm,'');
 const snapshots=new Map(), submissions=new Map(), headers=new Map(), pos=new Map();
+const editableDispatch = [
+  {DID: 101, InvoiceNo: 'INV/EDIT', POID: 50, DispatchNo: 'D1', DispatchQty: 4},
+  {DID: 102, InvoiceNo: 'INV/EDIT', POID: 50, DispatchNo: 'D2', DispatchQty: 3},
+  {DID: 103, InvoiceNo: 'INV/OTHER-PO-DISPATCH', POID: 50, DispatchNo: 'D3', DispatchQty: 2},
+];
 let writes=[];
 const irn='a'.repeat(64);
 const gstin='06BMTPS4959L1ZX';
@@ -31,10 +36,33 @@ globalThis.__freezeQuery=async(sql,args=[])=>{
  if(sql.startsWith('SELECT IRN FROM webInvoiceTaxSnapshots'))return snapshots.has(args[0])?[{IRN:snapshots.get(args[0]).IRN}]:[];
  if(sql.includes('SELECT State, ResultJson FROM webWhitebooksProductionIrn')||sql.includes('SELECT InvoiceID, RequestJson, ResultJson FROM webWhitebooksProductionIrn')||sql.startsWith('SELECT InvoiceID FROM webWhitebooksProductionIrn'))return submissions.has(args[0])?[{...submissions.get(args[0])}]:[];
  if(sql.startsWith('SELECT IRN, AckNo'))return [{...headers.get(args[1])}];
+ if(sql.startsWith('SELECT InvoiceID, InvoiceNo, POBarcode, IRN'))return headers.has(args[0])?[{...headers.get(args[0])}]:[];
+ if(sql.startsWith('SELECT 1 FROM webWhitebooksProductionIrn'))return submissions.has(args[0])?[{}]:[];
+ if(sql.startsWith('SELECT 1 FROM webWhitebooksSandboxIrn'))return [];
+ if(sql.startsWith('SELECT 1 FROM webInvoiceTaxSnapshots'))return snapshots.get(args[0])?.IRN?[{}]:[];
+ if(sql.startsWith('SELECT InvoiceNo FROM webWhitebooksProductionIrn'))return args[0].filter(no=>submissions.has(no)).map(InvoiceNo=>({InvoiceNo}));
+ if(sql.startsWith('SELECT InvoiceNo FROM webWhitebooksSandboxIrn'))return [{InvoiceNo:'INV/SANDBOX'}];
+ if(sql.startsWith('SELECT InvoiceNo FROM webInvoiceTaxSnapshots'))return [];
+ if(sql.startsWith('SELECT POBarcode FROM tblPOHeaders') || sql.startsWith('SELECT POID FROM tblPODetails'))return [{}];
+ if(sql.startsWith('SELECT d.DID, d.POID')) {
+   const header=headers.get(args[0]);
+   if (args[0]==='INV/EDIT') return editableDispatch.filter(row=>row.InvoiceNo===args[0]).map(row=>({...row,Qty:row.DispatchQty}));
+   return (header.poids || [header.poid]).map(id=>({POID:id,Qty:pos.get(id).Qty}));
+ }
+ if(sql.startsWith('SELECT p.POID, p.SKUCode'))return [...pos.values()].filter(row=>row.POBarcode===args[0]).map(row=>({
+   ...row, Available: 10-editableDispatch.filter(dispatch=>dispatch.POID===row.POID).reduce((total,dispatch)=>total+dispatch.DispatchQty,0),
+ }));
  if(sql.startsWith('SELECT POBarcode,'))return [{...pos.get(args[0])}];
  if(sql.startsWith('SELECT InvoiceID'))return [];
  writes.push({sql,args});
- if(sql.includes('INSERT INTO webWhitebooksProductionIrn'))submissions.set(args[0],{InvoiceID:args[2],State:args[3],RequestJson:args[4]});
+ if(sql.startsWith('UPDATE tblDispatch SET DispatchQty'))editableDispatch.find(row=>row.DID===args[1]).DispatchQty=args[0];
+ else if(sql.startsWith('DELETE FROM tblDispatch')) {
+   for(const id of [].concat(args[0]))editableDispatch.splice(editableDispatch.findIndex(row=>row.DID===id),1);
+ } else if(sql.startsWith('INSERT INTO tblDispatch')) {
+   editableDispatch.push({DID:104,POID:args[0],DispatchQty:args[1],DispatchNo:args[3],InvoiceNo:args[4]});
+ } else if(sql.startsWith('UPDATE tblInvoiceHeader SET TotalInWords')) {
+   [...headers.values()].find(header=>header.InvoiceID===args[0]).TotalInWords=null;
+ } else if(sql.includes('INSERT INTO webWhitebooksProductionIrn'))submissions.set(args[0],{InvoiceID:args[2],State:args[3],RequestJson:args[4]});
  else if(sql.includes('INSERT INTO webInvoiceTaxSnapshots')) {
    if(!snapshots.get(args[0])?.IRN)snapshots.set(args[0],{InvoiceNo:args[1],IRN:null,SnapshotJson:args[2]});
  } else if(sql.includes('INSERT IGNORE INTO webInvoiceTaxSnapshots')) {
@@ -168,5 +196,45 @@ assert.equal((await api.getInvoice('INV/PENDING')).totals.cgstAmount,52.5);
 const save=await import(await module('productionIrnSave'));
 await save.saveProductionIrnFields(globalThis.__freezeQuery,'INV/PENDING',{Irn:'1'.repeat(64),AckNo:'99999',AckDt:'2026-10-28 12:00:00'});
 assert.equal((await api.getInvoice('INV/PENDING')).totals.cgstAmount,189);
+
+const quantities=await import(await module('invoiceQuantities'));
+invoice(11,'INV/EDIT',50,'PO/EDIT');
+invoice(12,'INV/TEST-SECOND-SKU',51,'PO/EDIT');
+pos.get(50).MRP=1799;
+headers.get('INV/EDIT').TotalInWords='Stale';
+const edit=(...changes)=>quantities.updateInvoiceQuantities('INV/EDIT',changes.map(([poid,previousQuantity,quantity])=>({poid,previousQuantity,quantity})));
+const options=async()=>(await quantities.getInvoiceQuantityOptions('INV/EDIT')).map(({poid,quantity,max})=>[poid,quantity,max]);
+assert.deepEqual(await options(),[[50,7,8],[51,0,10]]);
+const [firstEditableLine, addableLine] = await quantities.getInvoiceQuantityOptions('INV/EDIT');
+assert.equal(firstEditableLine.hsnCode, '42021250');
+assert.equal(firstEditableLine.mrp, 1799);
+assert.equal(firstEditableLine.rate, 1000);
+assert.equal(addableLine.mrp, null);
+assert.equal(addableLine.article, 'BAG/51');
+assert.equal(addableLine.taxLine.BuyingTaxCGST, 9);
+await assert.rejects(edit([50,7,9]),/available quantity/);
+await assert.rejects(edit([50,7,0]),/at least one item/);
+await assert.rejects(edit([20,0,1]),/belong to this invoice’s PO/);
+await assert.rejects(edit([50,7,2.5]),/whole-number/);
+await edit([50,7,2],[51,0,3]);
+assert.deepEqual(await options(),[[50,2,8],[51,3,10]]);
+assert.equal(headers.get('INV/EDIT').TotalInWords,null);
+await assert.rejects(edit([50,7,3]),/quantities changed/);
+await edit([50,2,8]);
+assert.equal(editableDispatch.filter(row=>row.POID===50).reduce((sum,row)=>sum+row.DispatchQty,0),10);
+await edit([50,8,0]);
+assert.deepEqual(await options(),[[50,0,8],[51,3,10]]);
+await assert.rejects(quantities.assertCurrentIrnQuantities(globalThis.__freezeQuery,headers.get('INV/EDIT'),{
+  header:headers.get('INV/EDIT'),lines:[{POID:50,Qty:3}],
+}),/quantities or IRN status changed/);
+submissions.set('INV/EDIT',{State:'pending'});
+await assert.rejects(edit([51,3,2]),/locked/);
+const invoiceList=await quantities.markEditableInvoiceRows([
+  {InvoiceID:1,InvoiceNo:'INV/A',POBarcode:'PO/A',IRN:irn},
+  {InvoiceID:2,InvoiceNo:'INV/B',POBarcode:'PO/A',IRN:'NULL'},
+  {InvoiceID:11,InvoiceNo:'INV/EDIT',POBarcode:'PO/EDIT',IRN:''},
+  {InvoiceID:13,InvoiceNo:'INV/SANDBOX',POBarcode:'PO/A',IRN:''},
+]);
+assert.deepEqual(invoiceList.map(row=>row.CanEditQuantities),[false,true,false,false]);
 delete globalThis.__freezeQuery;
-console.log('Passed registration → snapshot → PO tax edit → frozen/cancelled invoice, live unregistered invoice, unrelated PO isolation, historical recovery, missing/mismatched evidence, Excel and e-invoice outputs. All database/provider operations mocked.');
+console.log('Passed invoice tax freeze, Excel and e-invoice output, and invoice quantity edits and validation. All database/provider operations mocked.');

@@ -3,7 +3,8 @@ import { ensureInvoiceTaxSnapshots, saveTaxCandidate } from './invoiceTaxSnapsho
 import { createHash } from 'node:crypto';
 import { query, withTransaction } from './db';
 import { getInvoice } from './invoices';
-import { prepareEInvoice } from './eInvoice';
+import { prepareEInvoiceFromInvoice } from './eInvoice';
+import { assertCurrentIrnQuantities, InvoiceQuantityError, quantityInvoiceHeader } from './invoiceQuantities';
 import { authenticateWhitebooks, generateWhitebooksIrn, getEInvoiceConfig, WhitebooksError } from './whitebooks';
 
 async function ensureTable() {
@@ -35,7 +36,7 @@ export async function generateProductionIrn(invoiceNo, draft) {
   }
   if (existing) throw new WhitebooksError('A production request is pending or uncertain. Check WhiteBooks before resubmitting.');
   const invoice = await getInvoice(invoiceNo);
-  const prepared = await prepareEInvoice(invoiceNo, draft);
+  const prepared = prepareEInvoiceFromInvoice(invoice, draft);
   if (!prepared.valid) return { ok: false, error: 'Correct invoice validation errors first.', validation: prepared };
   if (prepared.hasIrn) throw new WhitebooksError('This invoice already has an IRN.');
   const document = prepared.document;
@@ -46,10 +47,13 @@ export async function generateProductionIrn(invoiceNo, draft) {
   const key = createHash('sha256').update(JSON.stringify([document.SellerDtls.Gstin, month >= 4 ? year : year - 1, document.DocDtls.Typ, document.DocDtls.No.toUpperCase()])).digest('hex');
   try {
     await withTransaction(async run => {
+      const header = await quantityInvoiceHeader(run, invoiceNo, true);
+      await assertCurrentIrnQuantities(run, header, invoice);
       await run('INSERT INTO webWhitebooksProductionIrn (InvoiceNo, DocumentKey, InvoiceID, State, RequestJson) VALUES (?, ?, ?, ?, ?)', [invoiceNo, key, invoice.header.InvoiceID, 'pending', JSON.stringify(document)]);
       await saveTaxCandidate(run,invoice,document);
     });
   } catch (error) {
+    if (error instanceof InvoiceQuantityError) throw new WhitebooksError(error.message);
     if (error.code === 'ER_DUP_ENTRY') throw new WhitebooksError('A production submission already exists. Refresh the invoice.');
     throw error;
   }

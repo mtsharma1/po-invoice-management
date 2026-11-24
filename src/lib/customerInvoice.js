@@ -4,6 +4,7 @@ import { getWebSettings } from './settings';
 import { ensureInvoiceTaxVersionColumn } from './invoiceTaxSchema';
 import { ensureInvoicePresentationColumns } from './invoicePresentationSchema';
 import { ensureInvoiceTransportationColumn } from './invoiceTransportationSchema';
+import { markEditableInvoiceRows } from './invoiceQuantities';
 
 const defaultBankDetails = {
   AccountNo: '6811361613',
@@ -59,11 +60,12 @@ export async function listCustomerInvoices({ search = '', limit = 100 } = {}) {
     : '';
   const params = search ? [like, like, like, like, like, Number(limit)] : [Number(limit)];
 
-  return query(
+  const rows = await query(
     `SELECT
        h.InvoiceID,
        h.InvoiceNo,
        h.InvoiceDate,
+       h.IRN,
        h.POBarcode,
        h.OrderNumber,
        h.OrderDate,
@@ -76,6 +78,7 @@ export async function listCustomerInvoices({ search = '', limit = 100 } = {}) {
      LIMIT ?`,
     params
   );
+  return markEditableInvoiceRows(rows);
 }
 
 export async function getCustomerInvoiceScreenData({ invoiceNo = '', search = '' } = {}) {

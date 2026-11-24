@@ -43,7 +43,7 @@ export async function query(sql, params = []) {
   return rows;
 }
 
-export async function withTransaction(work) {
+export async function withTransaction(work, { readCommitted = false } = {}) {
   const connection = await getPool().getConnection();
   const run = async (sql, params = []) => {
     const [rows] = await connection.query(sql, params);
@@ -51,6 +51,7 @@ export async function withTransaction(work) {
   };
 
   try {
+    if (readCommitted) await connection.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
     await connection.beginTransaction();
     const result = await work(run, connection);
     await connection.commit();

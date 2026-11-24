@@ -68,6 +68,10 @@ export async function getEInvoiceScreenData({ invoiceNo = '', search = '' } = {}
 
 export async function prepareEInvoice(invoiceNo, overrides = {}) {
   const invoice = await getInvoice(clean(invoiceNo));
+  return prepareEInvoiceFromInvoice(invoice, overrides);
+}
+
+export function prepareEInvoiceFromInvoice(invoice, overrides = {}) {
   if (!invoice.header) throw new Error('Invoice not found.');
   const draft = mergeDraft(createEInvoiceDraft(invoice), overrides);
   return publicPreparation(prepareFromInvoice(invoice, draft), true);
