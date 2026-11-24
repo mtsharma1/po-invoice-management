@@ -75,6 +75,8 @@ export async function getMasterScreenData(poBarcode = '') {
          d.Colour,
          d.MRP,
          d.Quantity,
+         COALESCE(d.Quantity, 0) - COALESCE((SELECT SUM(active.DispatchQty)
+           FROM tblDispatch active WHERE active.POID = d.POID), 0) AS AvailableQuantity,
          d.ListPriceFOBTransportExcise AS Rate,
          d.LandingPrice,
          d.BuyingTaxCGST,

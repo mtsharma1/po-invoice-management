@@ -20,6 +20,7 @@ const columns = [
   ['Colour', 'Color'],
   ['MRP', 'MRP'],
   ['Quantity', 'Quantity'],
+  ['AvailableQuantity', 'Available quantity'],
   ['Rate', 'List price FOB transport excise'],
   ['LandingPrice', 'Landing price'],
   ['BuyingTaxCGST', 'Buying Tax CGST (%)'],
@@ -411,7 +412,7 @@ export default function MasterWorkbench({ data, selectedPO }) {
 }
 
 function numericField(field) {
-  return ['POID', 'MRP', 'Quantity', 'Rate', 'LandingPrice', 'BuyingTaxCGST', 'BuyingTaxIGST', 'BuyingTaxSGST', 'BuyingTaxCGSTAmount', 'BuyingTaxIGSTAmount', 'BuyingTaxSGSTAmount'].includes(field);
+  return ['POID', 'MRP', 'Quantity', 'AvailableQuantity', 'Rate', 'LandingPrice', 'BuyingTaxCGST', 'BuyingTaxIGST', 'BuyingTaxSGST', 'BuyingTaxCGSTAmount', 'BuyingTaxIGSTAmount', 'BuyingTaxSGSTAmount'].includes(field);
 }
 
 function displayValue(field, value) {
@@ -439,7 +440,7 @@ function displayValue(field, value) {
   if (['MRP', 'Rate', 'LandingPrice', 'BuyingTaxCGSTAmount', 'BuyingTaxIGSTAmount', 'BuyingTaxSGSTAmount'].includes(field)) {
     return Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-  if (field === 'Quantity' || field === 'POID') return Number(value).toLocaleString('en-IN');
+  if (field === 'Quantity' || field === 'AvailableQuantity' || field === 'POID') return Number(value).toLocaleString('en-IN');
   return String(value);
 }
 

@@ -2,7 +2,7 @@ import { isSameOriginRequest } from '@/lib/requestOrigin';
 import { getCurrentSession } from '@/lib/auth';
 import { canAccessFeature, FEATURES } from '@/lib/permissions';
 import { generateSandboxIrn, getSandboxIrn } from '@/lib/whitebooksIrn';
-import { generateProductionIrn, getProductionIrn } from '@/lib/whitebooksProductionIrn';
+import { generateProductionIrn, getProductionIrn, reconcileProductionIrn } from '@/lib/whitebooksProductionIrn';
 import { WhitebooksError, getEInvoiceEnvironment } from '@/lib/whitebooks';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +23,10 @@ async function handle(request, generate) {
     const invoiceNo = typeof payload?.invoiceNo === 'string' ? payload.invoiceNo.trim() : '';
     if (!invoiceNo || invoiceNo.length > 255) return json({ ok: false, error: 'A valid invoice number is required.' }, 400);
     const environment = getEInvoiceEnvironment();
+    if (generate && payload.action === 'reconcile') {
+      if (environment !== 'production') return json({ ok: false, error: 'IRN status recovery is available for production.' }, 400);
+      return json({ ...await reconcileProductionIrn(invoiceNo), environment });
+    }
     const generateIrn = environment === 'production' ? generateProductionIrn : generateSandboxIrn;
     const getIrn = environment === 'production' ? getProductionIrn : getSandboxIrn;
     const result = generate

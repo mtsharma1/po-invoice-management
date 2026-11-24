@@ -12,6 +12,8 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
   const [form, setForm] = useState(normaliseInvoice(selectedInvoice));
   const [mainSearchText, setMainSearchText] = useState(selectedInvoiceNo || selectedInvoice?.InvoiceNo || '');
   const [listSearchText, setListSearchText] = useState(search || '');
+  const cancelled = Boolean(form.CancelledAt);
+  const [cancellingId, setCancellingId] = useState(null);
   const [message, setMessage] = useState('');
   const [qrSrc, setQrSrc] = useState('/qr.png');
   const [isPending, startTransition] = useTransition();
@@ -34,6 +36,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
   const canPrint = useMemo(() => Boolean(form.InvoiceNo), [form.InvoiceNo]);
 
   function updateField(field, value) {
+    if (cancelled) return;
     setForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -80,6 +83,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
   }
 
   function saveInvoice() {
+    if (cancelled) return;
     startTransition(async () => {
       try {
         setMessage('Saving invoice...');
@@ -100,6 +104,23 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
         setMessage(error.message);
       }
     });
+  }
+
+  async function cancelInvoice(row) {
+    if (cancellingId || !window.confirm('Cancel invoice ' + row.InvoiceNo + '?\n\nIts quantities will become available again. The invoice will be permanently read-only.\n\nIf an IRN exists, you must cancel the invoice manually on the E-Invoice portal. This application does not cancel it on the portal.\n\nContinue?')) return;
+    setCancellingId(row.InvoiceID);
+    try {
+      const response = await fetch('/api/customer-invoice/cancel', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId: row.InvoiceID, confirmed: true }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || 'Cancellation failed.');
+      if (Number(form.InvoiceID) === Number(row.InvoiceID)) setForm(current => ({ ...current, CancelledAt: new Date().toISOString() }));
+      setMessage(result.message);
+      router.refresh();
+    } catch (error) { setMessage(error.message); }
+    finally { setCancellingId(null); }
   }
 
   function generateQR() {
@@ -132,7 +153,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
         </div>
         <div className="customer-invoice-title-actions">
           <span className={`invoice-record-badge ${form.InvoiceNo ? 'active' : ''}`}>
-            <i /> {form.InvoiceNo ? 'Invoice selected' : 'New invoice'}
+            <i /> {cancelled ? 'Cancelled' : form.InvoiceNo ? 'Invoice selected' : 'New invoice'}
           </span>
           {canPrint ? (
             <a className="access-command export-command" href={exportHref}><ActionIcon name="download" /> Export Excel</a>
@@ -144,6 +165,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
 
       <div className="customer-invoice-grid">
         <div className="customer-invoice-left">
+          <fieldset className="invoice-edit-fields" disabled={cancelled || cancellingId !== null}>
           <div className="invoice-section-heading ">
             <div><p>Invoice details</p><span>Primary identifiers and tax configuration</span></div>
           </div>
@@ -238,9 +260,10 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
               placeholder="Enter a note to print on this invoice above the tax summary" />
           </label>
 
+          </fieldset>
           <div className="invoice-action-bar">
             <button className="invoice-new-button" type="button" onClick={addNew}><ActionIcon name="plus" /> New invoice</button>
-            <button className="save-invoice-button" type="button" onClick={saveInvoice} disabled={isPending}><ActionIcon name="save" /> {isPending ? 'Saving…' : 'Save invoice'}</button>
+            <button className="save-invoice-button" type="button" onClick={saveInvoice} disabled={isPending || cancelled || cancellingId !== null}><ActionIcon name="save" /> {isPending ? 'Saving…' : 'Save invoice'}</button>
             {canPrint ? (
               <Link className="invoice-print-button" href={`/invoices/${encodeURIComponent(form.InvoiceNo)}`}><ActionIcon name="print" /> Print preview</Link>
             ) : (
@@ -269,12 +292,14 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
             <button className="filter-clear-btn" type="button" onClick={clearListSearch} title="Clear invoice list search"><ActionIcon name="reset" /> Clear</button>
           </div>
           <div className="invoice-list-scroll">
-            <table className="mini-list-table">
+            <table className="mini-list-table customer-invoice-records">
               <thead>
                 <tr>
                   <th>INVOICE ID</th>
                   <th>INVOICE NO</th>
                   <th>INVOICE DATE</th>
+                  <th scope="col">ACTION</th>
+                  <th scope="col">CANCEL</th>
                 </tr>
               </thead>
               <tbody>
@@ -287,10 +312,31 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
                     <td className="num">{row.InvoiceID}</td>
                     <td>{row.InvoiceNo}</td>
                     <td>{dateText(row.InvoiceDate)}</td>
+                    <td>
+                      {row.CanEditQuantities ? (
+                        <Link
+                          className="customer-invoice-edit-link"
+                          href={`/customer-invoice/${encodeURIComponent(row.InvoiceNo)}/edit`}
+                          aria-label={`Edit invoice ${row.InvoiceNo}`}
+                          onClick={event => event.stopPropagation()}
+                        >
+                          <ActionIcon name="edit" /> Edit
+                        </Link>
+                      ) : null}
+                    </td>
+                    <td>
+                      {row.CancelledAt ? <span className="invoice-cancelled-label">Cancelled</span> : (
+                        <button type="button" className="invoice-cancel-button" disabled={cancellingId !== null || isPending}
+                          onClick={event => { event.stopPropagation(); cancelInvoice(row); }}
+                          aria-label={`Cancel invoice ${row.InvoiceNo}`}>
+                          {cancellingId === row.InvoiceID ? 'Cancelling…' : 'Cancel invoice'}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {!rows.length ? (
-                  <tr><td colSpan="3">No invoice found.</td></tr>
+                  <tr><td colSpan="5">No invoice found.</td></tr>
                 ) : null}
               </tbody>
             </table>

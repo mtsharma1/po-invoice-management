@@ -12,10 +12,12 @@ export default function WhitebooksIrnAction({ draft, validation, disabled, onVal
 
   useEffect(() => {
     const controller = new AbortController();
+    setSubmission(null); setStatusLoaded(false); setPending(true); setMessage('');
     fetch(`/api/whitebooks/irn?invoiceNo=${encodeURIComponent(draft.invoiceNo)}`, { signal: controller.signal, cache: 'no-store' })
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok || !body.ok) throw new Error(body.error || 'Could not load IRN status.');
+        if (controller.signal.aborted) return;
         setEnvironment(body.environment);
         setSubmission(body.submission);
         setStatusLoaded(true);
@@ -38,6 +40,10 @@ export default function WhitebooksIrnAction({ draft, validation, disabled, onVal
       });
       const body = await response.json();
       if (body.validation) onValidation(body.validation);
+      if (body.state === 'rejected') {
+        setSubmission({ state: 'rejected', result: null }); setStatusLoaded(true);
+        setMessage(`${body.error} Correct the invoice, then validate before retrying.`); return;
+      }
       if (!response.ok || !body.ok) throw new Error(body.error || 'IRN generation failed.');
       setSubmission({ state: body.state, result: body.result });
       setMessage(body.warning || `${environment} IRN generated and saved.`);
@@ -49,6 +55,24 @@ export default function WhitebooksIrnAction({ draft, validation, disabled, onVal
       setPending(false);
       busy.current = false;
     }
+  }
+
+  async function checkStatus() {
+    if (busy.current) return;
+    busy.current = true; setPending(true); setMessage('Checking the saved document details in WhiteBooks…');
+    try {
+      const response = await fetch('/api/whitebooks/irn', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceNo: draft.invoiceNo, action: 'reconcile' }),
+      });
+      const body = await response.json();
+      if (!response.ok || !body.ok) throw new Error(body.error || 'Unable to check IRN status.');
+      setSubmission(body.state === 'not_submitted' ? null : { state: body.state, result: body.result });
+      setStatusLoaded(true);
+      setMessage(body.warning || (body.state === 'succeeded' ? 'Existing IRN recovered and saved. No new IRN was generated.' : 'You can correct the invoice, validate it, and generate the IRN.'));
+      if (body.state === 'succeeded') onGenerated?.(body.result);
+    } catch (error) { setMessage(error.message); }
+    finally { busy.current = false; setPending(false); }
   }
 
   function download() {
@@ -65,9 +89,10 @@ export default function WhitebooksIrnAction({ draft, validation, disabled, onVal
       <header><div><h3>WhiteBooks {environment} IRN</h3><p>{environment === 'production' ? 'Production results are saved to the selected invoice. Included transport details request an e-way bill with the IRN.' : 'Test results are stored separately from production invoice IRNs.'}</p></div></header>
       <div className="einvoice-section-body">
         <button className="einvoice-download" type="button" onClick={generate}
-          disabled={pending || disabled || !statusLoaded || (Boolean(submission) && submission.state !== 'generated') || (!submission?.result && (Boolean(draft.irn) || !validation?.valid || validation?.stale))}>
+          disabled={pending || disabled || !statusLoaded || (Boolean(submission) && !['generated', 'rejected', 'retryable'].includes(submission.state)) || (!submission?.result && (Boolean(draft.irn) || !validation?.valid || validation?.stale))}>
           {pending ? 'Working…' : submission?.state === 'generated' ? 'Save generated IRN' : `Generate ${environment} IRN`}
         </button>
+        {environment === 'production' ? <button className="einvoice-download" type="button" disabled={pending || disabled} onClick={checkStatus}>Check IRN status</button> : null}
         {!validation?.valid || validation?.stale ? <p>Validate the current invoice before generating.</p> : null}
         {submission?.result ? <>
           <p style={{ overflowWrap: 'anywhere' }}>IRN: {submission.result.Irn}</p>
@@ -75,7 +100,8 @@ export default function WhitebooksIrnAction({ draft, validation, disabled, onVal
           {submission.result.EwbNo ? <p>E-way bill: {submission.result.EwbNo} · Valid until: {submission.result.EwbValidTill}</p> : null}
           <button type="button" onClick={download}>Download result</button>
         </> : null}
-        {submission && submission.state !== 'succeeded' ? <p>Submission pending or uncertain. Check WhiteBooks by document details before resubmitting.</p> : null}
+        {submission && ['pending', 'uncertain'].includes(submission.state) ? <p>Submission pending or uncertain. Use Check IRN status before resubmitting.</p> : null}
+        {submission?.state === 'rejected' ? <p>The previous submission was rejected. Correct the invoice and validate before retrying.</p> : null}
         <p role="status" aria-live="polite">{message}</p>
       </div>
     </section>

@@ -119,6 +119,8 @@ export function buildStandaloneEwayBill(document, transport) {
 }
 
 export async function generateEwayBill(invoiceNo, transport, draft, environment = getEwayBillEnvironment()) {
+  const currentInvoice = await getInvoice(invoiceNo);
+  if (currentInvoice.header?.CancelledAt) throw new WhitebooksError('Cancelled invoices cannot generate e-way bills.');
   const table = resultTable(environment);
   const existing = await getEwayBill(invoiceNo, environment);
   if (existing?.state === 'succeeded') return { ok: true, ...existing };

@@ -6,6 +6,7 @@ import { dateText, money, qty } from '@/lib/format';
 import { listInvoices } from '@/lib/invoices';
 import { safeData } from '@/lib/safeData';
 import ActionIcon from '@/components/ActionIcon';
+import { invoiceStatus } from '@/lib/invoiceStatus';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,7 @@ export default async function InvoicesPage({ searchParams }) {
                 <th>Lines</th>
                 <th>Qty</th>
                 <th>Taxable</th>
+                <th>Status</th>
                 <th aria-label="Actions" />
               </tr>
             </thead>
@@ -80,6 +82,7 @@ export default async function InvoicesPage({ searchParams }) {
                   <td className="num"><span className="invoice-line-badge">{qty(row.lineCount)}</span></td>
                   <td className="num">{qty(row.totalQty)}</td>
                   <td className="num">{money(row.taxableAmount)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{invoiceStatus(row)}</td>
                   <td><Link className="invoice-row-action" href={`/invoices/${encodeURIComponent(row.InvoiceNo)}`}>View <ActionIcon name="arrow" /></Link></td>
                 </tr>
               ))}

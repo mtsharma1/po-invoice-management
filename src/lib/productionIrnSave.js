@@ -13,9 +13,10 @@ export async function saveProductionIrnFields(run, invoiceNo, result) {
   const records = await run('SELECT InvoiceID FROM webWhitebooksProductionIrn WHERE InvoiceNo = ? FOR UPDATE', [invoiceNo]);
   if (!records.length) throw new Error('Saved production submission not found.');
   const id = records[0].InvoiceID;
-  const headers = await run('SELECT IRN, AckNo, AckDate FROM tblInvoiceHeader WHERE InvoiceID = ? AND InvoiceNo = ? FOR UPDATE', [id, invoiceNo]);
+  const headers = await run('SELECT IRN, AckNo, AckDate, CancelledAt FROM tblInvoiceHeader WHERE InvoiceID = ? AND InvoiceNo = ? FOR UPDATE', [id, invoiceNo]);
   if (!headers.length) throw new Error('Selected invoice no longer matches the saved submission.');
   const header = headers[0];
+  if (header.CancelledAt) throw new Error('Cancelled invoices cannot be edited.');
   const current = normalizeStoredIrn(header.IRN);
   if (current && current !== irn) throw new Error('Invoice already has a different IRN; existing details were preserved.');
   await freezeTaxCandidate(run,id,invoiceNo,irn);

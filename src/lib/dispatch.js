@@ -333,9 +333,8 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
     ifscCode: String(settings.ifscCode || '').trim() || defaultInvoiceBankDetails.ifscCode,
   };
 
+  await ensureWebDispatchTables();
   return withTransaction(async (run) => {
-    await ensureWebDispatchTables(run);
-
     const existingInvoiceRows = await run(
       'SELECT InvoiceID FROM tblInvoiceHeader WHERE InvoiceNo = ? LIMIT 1',
       [invoiceNo]
@@ -458,7 +457,7 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
       insertedRows: inserted.affectedRows || 0,
       message: `Dispatch posted with ${dispatchNo}.`,
     };
-  });
+  }, { readCommitted: true });
 }
 
 export async function uploadDispatchFile({ sessionId, selectedPO = '', fileBuffer }) {
