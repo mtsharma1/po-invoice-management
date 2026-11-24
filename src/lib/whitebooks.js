@@ -24,6 +24,56 @@ export function getEInvoiceConfig(environment = getEInvoiceEnvironment()) {
 
 export class WhitebooksError extends Error {}
 
+export class WhitebooksIrnRejection extends WhitebooksError {}
+
+// Only documented input errors can unlock a rejected submission. Duplicate,
+// cancelled, internal and unrecognised errors always require status recovery.
+const IRN_INPUT_ERRORS = {
+  2155: 'Supplier GSTIN is required.', 2159: 'Invalid reverse-charge value.',
+  2162: 'Reverse charge is not applicable to this transaction.', 2163: 'Document date cannot be in the future.',
+  2169: 'Supplier GSTIN does not match the submitting account.',
+  2172: 'Intra-state transactions require CGST/SGST unless IGST on intra-state supply applies.',
+  2173: 'Too many invoice items.', 2174: 'Inter-state transactions require IGST.',
+  2176: 'Invalid HSN code. Review the invoice items.', 2276: 'Invalid supplier PIN code.',
+  2279: 'Invalid schema version.', 2280: 'Invalid document type.',
+  2284: 'Document date is outside the permitted reporting period.', 2285: 'Invalid IGST on intra-state value.',
+  2288: 'Invalid recipient GSTIN.', 2291: 'Invalid supplier GSTIN.',
+};
+function irnErrorCodes(payload) {
+  let errors = payload?.ErrorDetails ?? payload?.data?.ErrorDetails ?? payload?.status_desc;
+  if (typeof errors === 'string') { try { errors = JSON.parse(errors); } catch { return []; } }
+  if (!Array.isArray(errors) || !errors.length) return [];
+  return errors.map(error => String(error?.ErrorCode ?? ''));
+}
+
+export async function getWhitebooksIrnByDocument(document, { authToken, irp }, environment = 'production') {
+  const { baseUrl, values } = getEInvoiceConfig(environment);
+  if (document?.SellerDtls?.Gstin !== values.gstin?.trim() || !irp) throw new WhitebooksError('The saved supplier account and IRP must match before checking IRN status.');
+  const url = new URL('/einvoice/type/GETIRNBYDOCDETAILS/version/V1_03', baseUrl);
+  url.searchParams.set('email', values.email.trim()); url.searchParams.set('irp', irp);
+  url.searchParams.set('param1', document.DocDtls.Typ);
+  const headers = Object.fromEntries(['ip_address', 'client_id', 'client_secret', 'username', 'gstin'].map(key => [key, values[key]]));
+  let payload;
+  try {
+    const response = await fetch(url, { method: 'GET', headers: { ...headers, 'auth-token': authToken, docnum: document.DocDtls.No, docdate: document.DocDtls.Dt }, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20000) });
+    if (!response.ok) throw new Error('Lookup failed');
+    payload = await response.json();
+  } catch { throw new WhitebooksError('Unable to check IRN status. The submission remains locked; try checking again.'); }
+  const codes = irnErrorCodes(payload);
+  if (String(payload?.status_cd) === '0' && codes.length && codes.every(code => code === '2148') && !payload?.data?.Irn) return null;
+  const data = payload?.data;
+  if (!['1', 'success', 'sucess'].includes(String(payload?.status_cd).toLowerCase()) || !/^[a-f0-9]{64}$/i.test(data?.Irn || '') || !data?.AckNo || !data?.AckDt || data?.Status !== 'ACT') {
+    throw new WhitebooksError('WhiteBooks did not confirm an active IRN or its absence. Check the portal; the submission remains locked.');
+  }
+  // Match the original submission, never the currently edited browser draft.
+  try {
+    const decoded = JSON.parse(Buffer.from(data.SignedInvoice.split('.')[1], 'base64url').toString('utf8'));
+    const signed = typeof decoded.data === 'string' ? JSON.parse(decoded.data) : decoded.data ?? decoded;
+    if (signed.SellerDtls?.Gstin !== document.SellerDtls.Gstin || signed.DocDtls?.No !== document.DocDtls.No || signed.DocDtls?.Typ !== document.DocDtls.Typ || signed.DocDtls?.Dt !== document.DocDtls.Dt || (signed.Irn && signed.Irn.toLowerCase() !== data.Irn.toLowerCase())) throw new Error('Mismatch');
+  } catch { throw new WhitebooksError('Returned IRN could not be matched to the saved invoice. No invoice fields were changed.'); }
+  return Object.fromEntries(['Irn', 'AckNo', 'AckDt', 'SignedInvoice', 'SignedQRCode', 'Status', 'EwbNo', 'EwbDt', 'EwbValidTill'].filter(key => ['string', 'number'].includes(typeof data[key])).map(key => [key, data[key]]));
+}
+
 // Read-only full EWB lookup. This wrapper uses the documented GSP headers,
 // not an e-invoice auth-token. Never call generation to fill missing PDF fields.
 export async function getWhitebooksEwayBillDetails(ewbNo, environment = getEwayBillEnvironment()) {
@@ -90,6 +140,10 @@ export async function generateWhitebooksIrn(document, authToken, environment = g
     throw new WhitebooksError('IRN outcome is uncertain. Check WhiteBooks by document details before another submission.');
   }
   const data = payload?.data;
+  const codes = irnErrorCodes(payload);
+  if (String(payload?.status_cd) === '0' && !data?.Irn && codes.length && codes.every(code => Object.hasOwn(IRN_INPUT_ERRORS, code))) {
+    throw new WhitebooksIrnRejection('WhiteBooks rejected the invoice: ' + codes.map(code => `${code}: ${IRN_INPUT_ERRORS[code]}`).join(' '));
+  }
   if (!['sucess', 'success', '1'].includes(String(payload?.status_cd).toLowerCase())
       || !/^[a-f0-9]{64}$/i.test(data?.Irn || '') || !data?.AckNo) {
     throw new WhitebooksError('WhiteBooks did not return a confirmed IRN. Check the request in WhiteBooks before another submission.');

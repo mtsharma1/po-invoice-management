@@ -5,7 +5,7 @@ import { query, withTransaction } from './db';
 import { getInvoice } from './invoices';
 import { prepareEInvoiceFromInvoice } from './eInvoice';
 import { assertCurrentIrnQuantities, InvoiceQuantityError, quantityInvoiceHeader } from './invoiceQuantities';
-import { authenticateWhitebooks, generateWhitebooksIrn, getEInvoiceConfig, WhitebooksError } from './whitebooks';
+import { authenticateWhitebooks, generateWhitebooksIrn, getWhitebooksIrnByDocument, getEInvoiceConfig, WhitebooksError, WhitebooksIrnRejection } from './whitebooks';
 
 async function ensureTable() {
   await ensureInvoiceTaxSnapshots();
@@ -36,7 +36,7 @@ export async function generateProductionIrn(invoiceNo, draft) {
     await applyResult(invoiceNo, existing.result);
     return { ok: true, state: 'succeeded', result: existing.result };
   }
-  if (existing) throw new WhitebooksError('A production request is pending or uncertain. Check WhiteBooks before resubmitting.');
+  if (existing && !['rejected', 'retryable'].includes(existing.state)) throw new WhitebooksError('A production request is pending or uncertain. Check IRN status before resubmitting.');
   const invoice = await getInvoice(invoiceNo);
   const prepared = prepareEInvoiceFromInvoice(invoice, draft);
   if (!prepared.valid) return { ok: false, error: 'Correct invoice validation errors first.', validation: prepared };
@@ -51,7 +51,14 @@ export async function generateProductionIrn(invoiceNo, draft) {
     await withTransaction(async run => {
       const header = await quantityInvoiceHeader(run, invoiceNo, true);
       await assertCurrentIrnQuantities(run, header, invoice);
-      await run('INSERT INTO webWhitebooksProductionIrn (InvoiceNo, DocumentKey, InvoiceID, State, RequestJson) VALUES (?, ?, ?, ?, ?)', [invoiceNo, key, invoice.header.InvoiceID, 'pending', JSON.stringify(document)]);
+      if (existing) {
+        const reserved = await run(`UPDATE webWhitebooksProductionIrn SET DocumentKey = ?, State = 'pending', RequestJson = ?, UpdatedAt = CURRENT_TIMESTAMP
+          WHERE InvoiceNo = ? AND InvoiceID = ? AND State IN ('rejected', 'retryable') AND ResultJson IS NULL`,
+        [key, JSON.stringify(document), invoiceNo, invoice.header.InvoiceID]);
+        if (reserved.affectedRows !== 1) throw new WhitebooksError('Submission status changed. Refresh before generating.');
+      } else {
+        await run('INSERT INTO webWhitebooksProductionIrn (InvoiceNo, DocumentKey, InvoiceID, State, RequestJson) VALUES (?, ?, ?, ?, ?)', [invoiceNo, key, invoice.header.InvoiceID, 'pending', JSON.stringify(document)]);
+      }
       await saveTaxCandidate(run,invoice,document);
     });
   } catch (error) {
@@ -67,8 +74,54 @@ export async function generateProductionIrn(invoiceNo, draft) {
     await applyResult(invoiceNo, result);
   } catch (error) {
     if (result) return { ok: true, state: 'generated', result, warning: 'IRN generated but invoice saving needs recovery. Download this result. Use Save generated IRN to retry saving without generating again.' };
+    if (error instanceof WhitebooksIrnRejection) {
+      const saved = await query("UPDATE webWhitebooksProductionIrn SET State = ? WHERE InvoiceNo = ? AND State = 'pending' AND ResultJson IS NULL", ['rejected', invoiceNo]);
+      if (saved.affectedRows !== 1) throw new WhitebooksError('Could not save the rejection status. Check IRN status before retrying.');
+      return { ok: false, state: 'rejected', error: error.message };
+    }
     await query('UPDATE webWhitebooksProductionIrn SET State = ? WHERE InvoiceNo = ?', ['uncertain', invoiceNo]).catch(() => {});
     throw error;
   }
   return { ok: true, state: 'succeeded', result };
+}
+
+export async function reconcileProductionIrn(invoiceNo) {
+  await ensureTable();
+  const [record] = await query(`SELECT InvoiceID, State, RequestJson, ResultJson, UpdatedAt,
+    TIMESTAMPDIFF(SECOND, UpdatedAt, CURRENT_TIMESTAMP) AS AgeSeconds
+    FROM webWhitebooksProductionIrn WHERE InvoiceNo = ?`, [invoiceNo]);
+  if (!record) return { ok: true, state: 'not_submitted', result: null };
+  if (['cancelled', 'canceled'].includes(record.State)) throw new WhitebooksError('This IRN is cancelled. It cannot be generated again.');
+  if (record.ResultJson) {
+    const result = JSON.parse(record.ResultJson);
+    if (result.Status && result.Status !== 'ACT') throw new WhitebooksError('The saved IRN is not active.');
+    await applyResult(invoiceNo, result);
+    return { ok: true, state: 'succeeded', result };
+  }
+  if (['rejected', 'retryable'].includes(record.State)) return { ok: true, state: record.State, result: null };
+  if (!['pending', 'uncertain'].includes(record.State)) throw new WhitebooksError('Submission status needs review.');
+  if (Number(record.AgeSeconds) < 300) throw new WhitebooksError('The previous request is recent. Wait five minutes before checking IRN status.');
+  const document = JSON.parse(record.RequestJson);
+  const invoice = await getInvoice(invoiceNo);
+  if (Number(invoice.header?.InvoiceID) !== Number(record.InvoiceID) || invoice.header?.CancelledAt) throw new WhitebooksError('The saved submission no longer matches an active invoice.');
+  const auth = await authenticateWhitebooks('production');
+  auth.irp ||= process.env.WHITEBOOKS_PRODUCTION_IRP?.trim();
+  const result = await getWhitebooksIrnByDocument(document, auth, 'production');
+  if (!result) {
+    // Lookup availability is time-limited. An older not-found response is not
+    // proof of absence, so never unlock historical submissions automatically.
+    if (Number(record.AgeSeconds) > 48 * 3600) throw new WhitebooksError('The submission is older than the reliable lookup window. Verify its document details on the portal; automatic retry remains blocked.');
+    const stored = String(invoice.header.IRN || '').trim().toLowerCase();
+    if (stored && !['null', 'undefined'].includes(stored)) throw new WhitebooksError('The invoice already contains an IRN. Reconcile it before retrying.');
+  }
+  const state = result ? 'generated' : 'retryable';
+  const saved = await query(`UPDATE webWhitebooksProductionIrn SET State = ?, ResultJson = ?, UpdatedAt = CURRENT_TIMESTAMP
+    WHERE InvoiceNo = ? AND InvoiceID = ? AND State = ? AND RequestJson = ? AND UpdatedAt = ? AND ResultJson IS NULL`,
+  [state, result ? JSON.stringify(result) : null, invoiceNo, record.InvoiceID, record.State, record.RequestJson, record.UpdatedAt]);
+  if (saved.affectedRows !== 1) throw new WhitebooksError('Submission status changed. Refresh and check again.');
+  if (result) {
+    try { await applyResult(invoiceNo, result); }
+    catch { return { ok: true, state: 'generated', result, warning: 'IRN recovered. Use Save generated IRN to retry saving its invoice fields.' }; }
+  }
+  return { ok: true, state: result ? 'succeeded' : 'retryable', result };
 }
