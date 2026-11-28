@@ -159,6 +159,7 @@ const customer = await load(`
   const ensureInvoicePresentationColumns = async () => {};
   const ensureInvoiceTransportationColumn = async () => {};
   const withTransaction = async (callback) => callback(globalThis.__invoiceTaxSaveRun);
+  ${await readFile('src/lib/invoiceNumber.js', 'utf8')}
   ${stripImports(await readFile('src/lib/customerInvoice.js', 'utf8'))}
 `);
 await customer.saveCustomerInvoice({ InvoiceID: 10, InvoiceNo: 'OLD', InvoiceDate: '2026-10-02', TaxDetailsVersion: 1, InvoiceNote: 'Invoice-specific\nsecond line', BeneficiaryName: 'Test beneficiary' });
@@ -288,12 +289,20 @@ const addressJson = einvoice.buildDocument({header: addressHeader, lines: []}, a
 assert.equal(addressJson.BuyerDtls.Gstin, addressDraft.buyer.Gstin);
 assert.equal(addressJson.ShipDtls.Gstin, addressDraft.shipping.Gstin);
 const missingShip = einvoice.createEInvoiceDraft({header: {...addressHeader, DeliveredToAddress: 'Warehouse 2, Kolkata, West Bengal, 700001'}, lines: []});
-assert.equal(missingShip.shipping.Gstin, '', 'distinct ship-to address must not inherit bill-to GSTIN');
+assert.equal(missingShip.shipping.Gstin, 'URP', 'unregistered ship-to defaults to URP');
+const missingShipInvoice = { header: addressHeader, lines: [] };
+assert.equal(einvoice.buildDocument(missingShipInvoice, missingShip).ShipDtls.Gstin, 'URP');
+const urpShippingValidation = einvoice.prepareEInvoiceFromInvoice(missingShipInvoice, missingShip);
+assert.ok(!urpShippingValidation.errors.some(error => error.section === 'Ship To' && error.code.startsWith('GSTIN')));
+const urpBuyerValidation = einvoice.prepareEInvoiceFromInvoice(missingShipInvoice, {
+  ...missingShip, buyer: { ...missingShip.buyer, Gstin: 'URP' },
+});
+assert.ok(urpBuyerValidation.errors.some(error => error.code === 'BUYER_GSTIN'));
 const sameShip = einvoice.createEInvoiceDraft({header: {...addressHeader, DeliveredToAddress: addressHeader.ConsigneeAddress, DeliveredToName: addressHeader.ConsigneeName}, lines: []});
 assert.equal(sameShip.shipping.Gstin, sameShip.buyer.Gstin);
 const missingData = einvoice.createEInvoiceDraft({header: { ConsigneeAddress: 'Hoogly, West Bengal, 712223', DeliveredToAddress: 'Hoogly, West Bengal, 712223' }, lines: []});
-assert.equal(missingData.buyer.Gstin, '');
-assert.equal(missingData.shipping.Gstin, '');
+assert.equal(missingData.buyer.Gstin, 'URP');
+assert.equal(missingData.shipping.Gstin, 'URP');
 console.log('Passed independent Bill To/Ship To GSTINs, names, inline addresses, JSON mapping and missing-data handling.');
 
 for (const split of [false, true]) for (const [rates, expected] of [

@@ -1,3 +1,5 @@
+import { getCurrentSession } from '@/lib/auth';
+import { canEditInvoice } from '@/lib/permissions';
 import AppShell from '@/components/AppShell';
 import CustomerInvoiceWorkbench from '@/components/CustomerInvoiceWorkbench';
 import { DataError } from '@/components/DataState';
@@ -21,6 +23,7 @@ export default async function CustomerInvoicePage({ searchParams }) {
       <PageHeader eyebrow="" title="CUSTOMER INVOICES" />
       <DataError error={error} />
       <CustomerInvoiceWorkbench
+        canEdit={canEditInvoice(await getCurrentSession())}
         rows={data.rows}
         selectedInvoice={data.selectedInvoice}
         selectedInvoiceNo={invoiceNo}

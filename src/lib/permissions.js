@@ -43,6 +43,10 @@ const pathFeatures = [
   ['/import', FEATURES.IMPORT_PO],
 ];
 
+export function canEditInvoice(session) {
+ return Boolean(session && (session.admin || Number(session.access) === 5));
+}
+
 export function canAccessFeature(session, feature) {
   if (!session) return false;
   if (session.admin || Number(session.access) === 5) return true;

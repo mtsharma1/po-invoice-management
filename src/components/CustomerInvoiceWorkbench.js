@@ -7,7 +7,7 @@ import { dateText } from '@/lib/format';
 import { invoiceQrUrl } from '@/lib/invoiceQr';
 import ActionIcon from './ActionIcon';
 
-export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, selectedInvoiceNo, search }) {
+export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, selectedInvoiceNo, search, canEdit = false }) {
   const router = useRouter();
   const [form, setForm] = useState(normaliseInvoice(selectedInvoice));
   const [mainSearchText, setMainSearchText] = useState(selectedInvoiceNo || selectedInvoice?.InvoiceNo || '');
@@ -82,6 +82,26 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
     router.push(`/customer-invoice?${params}`);
   }
 
+  async function renameInvoice(row) {
+    const entered = window.prompt('Enter the new invoice number', row.InvoiceNo);
+    if (entered === null || entered.trim() === row.InvoiceNo) return;
+    setMessage('');
+    try {
+      const response = await fetch('/api/customer-invoice/rename', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId: row.InvoiceID, previousNumber: row.InvoiceNo, invoiceNo: entered.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Unable to rename invoice.');
+      setMessage('Invoice number updated across all linked records.');
+      router.push(`/customer-invoice?invoiceNo=${encodeURIComponent(result.invoiceNo)}`);
+      router.refresh();
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
   function saveInvoice() {
     if (cancelled) return;
     startTransition(async () => {
@@ -90,7 +110,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
         const response = await fetch('/api/customer-invoice/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, OriginalInvoiceNo: selectedInvoice?.InvoiceNo }),
         });
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || 'Save failed.');
@@ -165,7 +185,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
 
       <div className="customer-invoice-grid">
         <div className="customer-invoice-left">
-          <fieldset className="invoice-edit-fields" disabled={cancelled || cancellingId !== null}>
+          <fieldset className="invoice-edit-fields" disabled={cancelled || cancellingId !== null || (Boolean(form.InvoiceID) && !canEdit)}>
           <div className="invoice-section-heading ">
             <div><p>Invoice details</p><span>Primary identifiers and tax configuration</span></div>
           </div>
@@ -263,7 +283,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
           </fieldset>
           <div className="invoice-action-bar">
             <button className="invoice-new-button" type="button" onClick={addNew}><ActionIcon name="plus" /> New invoice</button>
-            <button className="save-invoice-button" type="button" onClick={saveInvoice} disabled={isPending || cancelled || cancellingId !== null}><ActionIcon name="save" /> {isPending ? 'Saving…' : 'Save invoice'}</button>
+            <button className="save-invoice-button" type="button" onClick={saveInvoice} disabled={isPending || cancelled || cancellingId !== null || (Boolean(form.InvoiceID) && !canEdit)}><ActionIcon name="save" /> {isPending ? 'Saving…' : 'Save invoice'}</button>
             {canPrint ? (
               <Link className="invoice-print-button" href={`/invoices/${encodeURIComponent(form.InvoiceNo)}`}><ActionIcon name="print" /> Print preview</Link>
             ) : (
@@ -310,10 +330,16 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
                     className={row.InvoiceNo === form.InvoiceNo ? 'active-invoice-row' : ''}
                   >
                     <td className="num">{row.InvoiceID}</td>
-                    <td>{row.InvoiceNo}</td>
+                    <td>
+                      {row.InvoiceNo}
+                      {canEdit && row.CanEditQuantities ? <button type="button" className="customer-invoice-edit-link" title="Edit invoice number" aria-label={`Edit invoice number ${row.InvoiceNo}`} onClick={event => {
+                        event.stopPropagation();
+                        renameInvoice(row);
+                      }}><ActionIcon name="edit" /></button> : null}
+                    </td>
                     <td>{dateText(row.InvoiceDate)}</td>
                     <td>
-                      {row.CanEditQuantities ? (
+                      {canEdit && row.CanEditQuantities ? (
                         <Link
                           className="customer-invoice-edit-link"
                           href={`/customer-invoice/${encodeURIComponent(row.InvoiceNo)}/edit`}
@@ -326,7 +352,7 @@ export default function CustomerInvoiceWorkbench({ rows, selectedInvoice, select
                     </td>
                     <td>
                       {row.CancelledAt ? <span className="invoice-cancelled-label">Cancelled</span> : (
-                        <button type="button" className="invoice-cancel-button" disabled={cancellingId !== null || isPending}
+                        <button type="button" className="invoice-cancel-button" disabled={!canEdit || cancellingId !== null || isPending}
                           onClick={event => { event.stopPropagation(); cancelInvoice(row); }}
                           aria-label={`Cancel invoice ${row.InvoiceNo}`}>
                           {cancellingId === row.InvoiceID ? 'Cancelling…' : 'Cancel invoice'}

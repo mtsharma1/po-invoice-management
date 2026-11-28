@@ -119,9 +119,9 @@ export function createEInvoiceDraft(invoice) {
       Dt: formatEinvoiceDate(header.InvoiceDate),
     },
     seller,
-    buyer: { ...buyer, Pos: buyer.Stcd || clean(buyer.Gstin).slice(0, 2) },
+    buyer: { ...buyer, Gstin: buyer.Gstin || 'URP', Pos: buyer.Stcd || (buyer.Gstin ? clean(buyer.Gstin).slice(0, 2) : '') },
     dispatch: { enabled: dispatchEnabled, ...dispatch },
-    shipping: { enabled: shippingEnabled, ...shipping },
+    shipping: { enabled: shippingEnabled, ...shipping, Gstin: shipping.Gstin || 'URP' },
     exportDetails: {
       enabled: false,
       ShipBNo: '',
@@ -264,7 +264,7 @@ function buildDocument(invoice, draft) {
   if (draft.shipping.enabled) {
     const shipping = normalizedParty(draft.shipping);
     document.ShipDtls = {
-      Gstin: shipping.Gstin,
+      Gstin: shipping.Gstin || 'URP',
       LglNm: shipping.LglNm,
       TrdNm: nullable(shipping.TrdNm),
       Addr1: shipping.Addr1,
@@ -392,7 +392,7 @@ function validateDocument(document, invoice, draft) {
   }
 
   if (document.DispDtls) validateDispatch(document.DispDtls, 'Dispatch From', add);
-  if (document.ShipDtls) validateParty(document.ShipDtls, 'Ship To', add, { requireGstin: !exportSupply, allowUrp: exportSupply, foreign: exportSupply });
+  if (document.ShipDtls) validateParty(document.ShipDtls, 'Ship To', add, { requireGstin: false, allowUrp: true, foreign: exportSupply });
 
   if (!document.ItemList.length) add('Items', 'NO_ITEMS', 'At least one invoice item is required.');
   if (document.ItemList.length > 1000) add('Items', 'ITEM_LIMIT', 'An e-invoice may contain at most 1,000 items.');

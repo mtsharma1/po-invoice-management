@@ -359,15 +359,17 @@ function Field({ label, fieldKey, errors = [], children }) {
   const hasError = errors.length > 0;
   const controlId = fieldKey ? fieldControlId(fieldKey) : undefined;
   const errorId = hasError ? `${controlId}-error` : undefined;
+  const required = children.props.required || ['tran.SupTyp', 'doc.Typ', 'doc.No', 'doc.Dt', 'tran.RegRev', 'tran.IgstOnIntra', 'exportDetails.ForCur', 'exportDetails.CntCode'].includes(fieldKey);
   const control = cloneElement(children, {
     id: controlId,
     'data-field-key': fieldKey,
+    required,
     'aria-invalid': hasError ? 'true' : undefined,
     'aria-describedby': errorId,
   });
   return (
     <label className={`einvoice-field ${hasError ? 'has-error' : ''}`} htmlFor={controlId}>
-      <span>{label}{hasError ? <b>Needs attention</b> : null}</span>
+      <span>{label}{required ? ' *' : ''}{hasError ? <b>Needs attention</b> : null}</span>
       {control}
       {hasError ? <small id={errorId} className="einvoice-field-error">{errors.map((entry) => entry.message).join(' ')}</small> : null}
     </label>
@@ -384,15 +386,15 @@ function PartyEditor({ title, subtitle, section, party, update, errorsFor, inclu
     <section className="einvoice-party-card">
       <header><div><h3>{title}</h3>{subtitle ? <p>{subtitle}</p> : null}</div><span>{party.Stcd || '—'}</span></header>
       <div className="einvoice-form-grid cols-2">
-        {!hideGstin ? <Field label="GSTIN" fieldKey={`${section}.Gstin`} errors={fieldErrors('Gstin')}><input value={party.Gstin} onChange={(event) => update(section, 'Gstin', event.target.value.toUpperCase())} /></Field> : null}
-        {includePos ? <Field label="Place of supply" fieldKey={`${section}.Pos`} errors={fieldErrors('Pos')}><StateSelect value={party.Pos} onChange={(value) => update(section, 'Pos', value)} /></Field> : null}
-        <Field label="Legal name" fieldKey={`${section}.LglNm`} errors={fieldErrors('LglNm')}><input value={party.LglNm} onChange={(event) => update(section, 'LglNm', event.target.value)} /></Field>
+        {!hideGstin ? <Field label={section === 'shipping' ? 'GSTIN (URP if unregistered)' : 'GSTIN'} fieldKey={`${section}.Gstin`} errors={fieldErrors('Gstin')}><input required={section !== 'shipping'} value={party.Gstin} placeholder={section === 'shipping' ? 'Optional — defaults to URP' : undefined} onChange={(event) => update(section, 'Gstin', event.target.value.toUpperCase())} /></Field> : null}
+        {includePos ? <Field label="Place of supply" fieldKey={`${section}.Pos`} errors={fieldErrors('Pos')}><StateSelect required value={party.Pos} onChange={(value) => update(section, 'Pos', value)} /></Field> : null}
+        <Field label="Legal name" fieldKey={`${section}.LglNm`} errors={fieldErrors('LglNm')}><input required value={party.LglNm} onChange={(event) => update(section, 'LglNm', event.target.value)} /></Field>
         <Field label="Trade name" fieldKey={`${section}.TrdNm`} errors={fieldErrors('TrdNm')}><input value={party.TrdNm} onChange={(event) => update(section, 'TrdNm', event.target.value)} /></Field>
-        <Field label="Address line 1" fieldKey={`${section}.Addr1`} errors={fieldErrors('Addr1')}><input value={party.Addr1} onChange={(event) => update(section, 'Addr1', event.target.value)} /></Field>
+        <Field label="Address line 1" fieldKey={`${section}.Addr1`} errors={fieldErrors('Addr1')}><input required value={party.Addr1} onChange={(event) => update(section, 'Addr1', event.target.value)} /></Field>
         <Field label="Address line 2" fieldKey={`${section}.Addr2`} errors={fieldErrors('Addr2')}><input value={party.Addr2} onChange={(event) => update(section, 'Addr2', event.target.value)} /></Field>
-        <Field label="Location" fieldKey={`${section}.Loc`} errors={fieldErrors('Loc')}><input value={party.Loc} onChange={(event) => update(section, 'Loc', event.target.value)} /></Field>
-        <Field label="PIN" fieldKey={`${section}.Pin`} errors={fieldErrors('Pin')}><input value={party.Pin} onChange={(event) => update(section, 'Pin', event.target.value)} maxLength={6} /></Field>
-        <Field label="State code" fieldKey={`${section}.Stcd`} errors={fieldErrors('Stcd')}><StateSelect value={party.Stcd} onChange={(value) => update(section, 'Stcd', value)} /></Field>
+        <Field label="Location" fieldKey={`${section}.Loc`} errors={fieldErrors('Loc')}><input required value={party.Loc} onChange={(event) => update(section, 'Loc', event.target.value)} /></Field>
+        <Field label="PIN" fieldKey={`${section}.Pin`} errors={fieldErrors('Pin')}><input required value={party.Pin} onChange={(event) => update(section, 'Pin', event.target.value)} maxLength={6} /></Field>
+        <Field label="State code" fieldKey={`${section}.Stcd`} errors={fieldErrors('Stcd')}><StateSelect required value={party.Stcd} onChange={(value) => update(section, 'Stcd', value)} /></Field>
         {!hideContact ? <Field label="Phone" fieldKey={`${section}.Ph`} errors={fieldErrors('Ph')}><input value={party.Ph} onChange={(event) => update(section, 'Ph', event.target.value)} /></Field> : null}
         {!hideContact ? <Field label="Email" fieldKey={`${section}.Em`} errors={fieldErrors('Em')}><input value={party.Em} onChange={(event) => update(section, 'Em', event.target.value)} /></Field> : null}
       </div>
