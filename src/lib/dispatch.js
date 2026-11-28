@@ -336,7 +336,7 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
   await ensureWebDispatchTables();
   return withTransaction(async (run) => {
     const existingInvoiceRows = await run(
-      'SELECT InvoiceID FROM tblInvoiceHeader WHERE InvoiceNo = ? LIMIT 1',
+      'SELECT InvoiceID FROM tblInvoiceHeader WHERE LOWER(TRIM(InvoiceNo)) = LOWER(?) LIMIT 1',
       [invoiceNo]
     );
     if (existingInvoiceRows.length) {
@@ -457,7 +457,7 @@ export async function postDispatch({ sessionId, poBarcode, invoiceNo }) {
       insertedRows: inserted.affectedRows || 0,
       message: `Dispatch posted with ${dispatchNo}.`,
     };
-  }, { readCommitted: true });
+  }, { readCommitted: true, invoiceNumberLock: true });
 }
 
 export async function uploadDispatchFile({ sessionId, selectedPO = '', fileBuffer }) {

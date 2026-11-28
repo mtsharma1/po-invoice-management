@@ -9,7 +9,7 @@ import { getInvoice } from '@/lib/invoices';
 import { getEwayBill } from '@/lib/whitebooksEwayBill';
 import { safeData } from '@/lib/safeData';
 import { getCurrentSession } from '@/lib/auth';
-import { canAccessFeature, FEATURES } from '@/lib/permissions';
+import { canEditInvoice } from '@/lib/permissions';
 import { storedIrn } from '@/lib/invoiceTaxSnapshot';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export default async function InvoiceDetailPage({ params }) {
     return invoice;
   }, { header: null, lines: [], totals: {} });
   const canEdit = data.header && !storedIrn(data.header.IRN)
-    && canAccessFeature(await getCurrentSession(), FEATURES.CUSTOMER_INVOICE);
+    && canEditInvoice(await getCurrentSession());
 
   return (
     <AppShell>

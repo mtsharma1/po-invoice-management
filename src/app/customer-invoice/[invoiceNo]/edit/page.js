@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { getCurrentSession } from '@/lib/auth';
+import { canEditInvoice } from '@/lib/permissions';
 import AppShell from '@/components/AppShell';
 import InvoiceQuantityEditor from '@/components/InvoiceQuantityEditor';
 import InvoiceView from '@/components/InvoiceView';
@@ -12,6 +14,7 @@ export const dynamic = 'force-dynamic';
 const backHref = '/customer-invoice';
 
 export default async function CustomerInvoiceEditPage({ params }) {
+  if (!canEditInvoice(await getCurrentSession())) redirect('/customer-invoice');
   const { invoiceNo } = await params;
   const number = decodeURIComponent(invoiceNo);
   const invoice = await getInvoice(number);

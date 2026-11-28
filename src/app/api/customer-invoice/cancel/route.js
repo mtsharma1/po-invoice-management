@@ -1,13 +1,13 @@
 import { cancelCustomerInvoice } from '@/lib/invoiceCancellation';
 import { getCurrentSession } from '@/lib/auth';
-import { canAccessFeature, FEATURES } from '@/lib/permissions';
+import { canEditInvoice } from '@/lib/permissions';
 import { isSameOriginRequest } from '@/lib/requestOrigin';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   const session = await getCurrentSession();
-  if (!canAccessFeature(session, FEATURES.CUSTOMER_INVOICE) || !isSameOriginRequest(request)) {
+  if (!canEditInvoice(session) || !isSameOriginRequest(request)) {
     return Response.json({ ok: false, error: 'Invoice access and a same-origin request are required.' }, { status: 403 });
   }
   try {

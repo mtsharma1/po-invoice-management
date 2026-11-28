@@ -6,6 +6,7 @@ import { ensureInvoiceTaxVersionColumn } from './invoiceTaxSchema';
 import { ensureInvoicePresentationColumns } from './invoicePresentationSchema';
 import { ensureInvoiceTransportationColumn } from './invoiceTransportationSchema';
 import { markEditableInvoiceRows } from './invoiceQuantities';
+import { renameInvoiceReferences } from './invoiceNumber';
 
 const defaultBankDetails = {
   AccountNo: '6811361613',
@@ -117,6 +118,7 @@ export async function saveCustomerInvoice(payload) {
   const invoiceId = Number(payload?.InvoiceID || 0);
   if (!invoiceId) await ensureBuyingTaxColumns();
   const invoice = applyDefaultBankDetails(payload);
+  invoice.InvoiceNo = invoiceNo;
   if (payload?.TransportationCharges !== undefined) {
     invoice.TransportationCharges = normaliseTransportationCharges(payload.TransportationCharges);
   }
@@ -130,7 +132,11 @@ export async function saveCustomerInvoice(payload) {
       const existing = await run('SELECT InvoiceNo, IRN, TransportationCharges, AckNo, AckDate, SGST, CGST, IGSTRate, InterStateTax, CancelledAt FROM tblInvoiceHeader WHERE InvoiceID = ? FOR UPDATE', [invoiceId]);
       if (!existing.length) throw new Error('Invoice not found.');
       const saved = existing[0];
+      if (payload?.OriginalInvoiceNo !== undefined && saved.InvoiceNo !== payload.OriginalInvoiceNo) {
+        throw new Error('Invoice number changed. Refresh the invoice before saving.');
+      }
       if (saved.CancelledAt) throw new Error('Cancelled invoices cannot be edited.');
+      await renameInvoiceReferences(run, saved, invoiceNo);
       // Registration (including a cancelled IRN) is permanent invoice history.
       if (hasIrn(saved.IRN)) {
         invoice.IRN = saved.IRN;
@@ -152,7 +158,7 @@ export async function saveCustomerInvoice(payload) {
     const duplicateRows = await run(
       `SELECT InvoiceID
        FROM tblInvoiceHeader
-       WHERE InvoiceNo = ?
+       WHERE LOWER(TRIM(InvoiceNo)) = LOWER(?)
          AND (? = 0 OR InvoiceID <> ?)
        LIMIT 1`,
       [invoiceNo, invoiceId, invoiceId]
@@ -177,7 +183,7 @@ export async function saveCustomerInvoice(payload) {
       values
     );
     return { invoiceId: result.insertId, invoiceNo, bankDetails: savedBankDetails, message: 'Invoice created successfully.' };
-  });
+  }, { invoiceNumberLock: true });
 }
 
 function blankInvoice(settings) {

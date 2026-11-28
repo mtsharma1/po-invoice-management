@@ -1,12 +1,12 @@
 import { getCurrentSession } from '@/lib/auth';
 import { getInvoiceQuantityOptions, InvoiceQuantityError, updateInvoiceQuantities } from '@/lib/invoiceQuantities';
-import { canAccessFeature, FEATURES } from '@/lib/permissions';
+import { canEditInvoice } from '@/lib/permissions';
 import { isSameOriginRequest } from '@/lib/requestOrigin';
 
 export const dynamic = 'force-dynamic';
 
 async function handle(request, params, save) {
-  if (!canAccessFeature(await getCurrentSession(), FEATURES.CUSTOMER_INVOICE)) {
+  if (!canEditInvoice(await getCurrentSession())) {
     return Response.json({ error: 'Customer invoice access is required.' }, { status: 403 });
   }
   if (save && !isSameOriginRequest(request)) {

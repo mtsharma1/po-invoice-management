@@ -94,6 +94,7 @@ const customer = await load(`
   const ensureInvoicePresentationColumns = async () => {};
   const ensureInvoiceTransportationColumn = async () => {};
   const withTransaction = async work => work(globalThis.__freightRun);
+  ${await readFile('src/lib/invoiceNumber.js', 'utf8')}
   ${strip(await readFile('src/lib/customerInvoice.js', 'utf8'))}
 `);
 for (const invalid of [-1, '1.234', 'NaN', 'Infinity', '1e3', '9999999999999999']) {
